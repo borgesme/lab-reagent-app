@@ -19,6 +19,12 @@ export default function AdminLayout({
           <Link href="/admin/roles" className="block">
             角色
           </Link>
+          <Link href="/reagents" className="block">
+            试剂
+          </Link>
+          <Link href="/admin/stocks" className="block">
+            库存
+          </Link>
         </aside>
         <main className="flex-1 p-6">{children}</main>
       </div>
