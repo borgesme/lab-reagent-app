@@ -46,6 +46,8 @@ isControlled(reagent) => reagent.hazardLevel === 'CONTROLLED' || reagent.control
 ```
 所有业务规则分支唯一判定入口。不在 `Request` 上冗余存储。
 
+**函数位置**：`packages/shared/src/utils.ts`，前后端共用；入参类型为 `Pick<ReagentSummary, 'hazardLevel' | 'controlType'>`，避免耦合完整 `Reagent` 结构。
+
 ## 4. 数据模型变更
 
 一次 Prisma migration（`add_p4_compliance`）囊括 4 处变更：
@@ -111,11 +113,14 @@ model ControlledLedgerSnapshot {
 | 普通 | LAB_HEAD（本 lab） | 禁止 | level=1 一条 APPROVE |
 | 管控 | LAB_HEAD（本 lab） | SAFETY_OFFICER（本 lab） | level=1 + level=2 各一条 APPROVE |
 
-- 任一级 REJECT 立即置 `REJECTED`，写入 `rejectedReason`（级别与批注）。
-- 必须先 level=1 APPROVE，才能收 level=2；顺序颠倒返 400。
-- SAFETY_OFFICER 审批普通试剂或跨 lab → 403。
-- LAB_HEAD 不得提交 level=2；违反返 403。
-- SYS_ADMIN 可代任何级别 APPROVE/REJECT（运维兜底）。
+- 任一级 REJECT 立即置 `REJECTED`，写入 `rejectedReason`（格式："L{level}: {comment}"）。
+- 顺序约束：管控试剂必须先有 level=1 APPROVE 才允许 level=2 提交；违反返 **400** `"level=1 approval required first"`。
+- 角色越权：
+  - LAB_HEAD 提交 level=2 → **403**（角色不匹配）
+  - SAFETY_OFFICER 提交 level=1 → **403**（角色不匹配）
+  - SAFETY_OFFICER 审批普通试剂（level=2 对普通无意义）→ **400** `"level=2 not applicable"`
+  - 跨 lab → **403**
+- SYS_ADMIN 可代任何级别 APPROVE/REJECT（运维兜底，不做顺序强制）。
 
 ### 5.3 双人发放
 `IssueRequestDto` 新增 `witnessId?: string`、`signatureDataUrl?: string`。
@@ -144,18 +149,19 @@ model ControlledLedgerSnapshot {
 - `generateMonthly` 作为公开 service 方法，测试直接调用，不依赖 cron 触发
 
 ### 5.6 AuditLog 挂点
-继续用现有 `@Audit({ action, entityType })` 装饰器：
+继续用现有 `@Audit({ action, entityType })` 装饰器（静态 action，不动态区分 level）：
 
-| 端点 | action |
-|---|---|
-| `POST /requests` | `REQUEST_CREATE` |
-| `POST /requests/:id/cancel` | `REQUEST_CANCEL` |
-| `POST /requests/:id/approvals` (level=1) | `REQUEST_APPROVE` |
-| `POST /requests/:id/approvals` (level=2) | `REQUEST_SAFETY_APPROVE` |
-| `POST /requests/:id/approvals` (REJECT) | `REQUEST_REJECT` |
-| `POST /requests/:id/issues` | `REQUEST_ISSUE` |
-| `GET /controlled-ledger?format=csv` | `LEDGER_EXPORT` |
-| LedgerScheduler 归档 | `LEDGER_SNAPSHOT_GENERATE`（service 内手动写 AuditLog，无 HTTP context） |
+| 端点 | action | entityId 来源 |
+|---|---|---|
+| `POST /requests` | `REQUEST_CREATE` | 返回值 id |
+| `POST /requests/:id/cancel` | `REQUEST_CANCEL` | 返回值 id |
+| `POST /requests/:id/approvals` (APPROVE) | `REQUEST_APPROVE` | approval.id；`after.level` 内含级别 |
+| `POST /requests/:id/approvals` (REJECT) | `REQUEST_REJECT` | approval.id |
+| `POST /requests/:id/issues` | `REQUEST_ISSUE` | issue.id |
+| `GET /controlled-ledger?format=csv` | `LEDGER_EXPORT` | null |
+| LedgerScheduler 归档 | `LEDGER_SNAPSHOT_GENERATE` | snapshot.id（service 内手动 `prisma.auditLog.create`，无 HTTP context） |
+
+审计 payload 的 `after` 字段即承载 level / witnessId / signatureDataUrl 存在与否，不扩展 `@Audit` 装饰器支持 actionFn。
 
 ## 6. 后端模块布局
 
@@ -191,6 +197,8 @@ apps/api/src/
 
 前端依赖新增：`react-signature-canvas`（~10 KB，零传递依赖）。
 
+**SSR 注意**：`react-signature-canvas` 仅浏览器可用，Next.js App Router 下用 `'use client'` 组件包裹；若报错则改 `next/dynamic` 带 `ssr: false` 动态导入。
+
 ## 8. 测试策略
 
 沿用 Jest + supertest（后端 e2e）、vitest（前端单测）。
@@ -220,6 +228,9 @@ apps/api/src/
 ### 8.3 不做
 - `@Cron` 真实触发测试（依赖系统时间，脆弱）
 - 前端集成测试（延续 P3 仅做单测 + build）
+
+### 8.4 测试环境 Schedule 处理
+生产 `AppModule` 在 imports 中加入 `ScheduleModule.forRoot()`。e2e 测试直接引入 `AppModule`，默认也会启动 Schedule 调度器；但 cron 表达式 `5 0 1 * *` 每月仅触发一次，测试窗口内几乎不会命中。无需额外禁用。若未来需要禁用，可通过 `ConfigService` + `ScheduleModule.forRoot({ enabled: process.env.NODE_ENV !== 'test' })` 控制。
 
 ## 9. 依赖
 
