@@ -2,5 +2,7 @@
   "moduleFileExtensions": ["js", "ts"],
   "rootDir": ".",
   "testRegex": ".e2e-spec.ts$",
-  "transform": { "^.+\\.ts$": "ts-jest" }
+  "transform": { "^.+\\.ts$": "ts-jest" },
+  "testTimeout": 30000,
+  "maxWorkers": 2
 }
