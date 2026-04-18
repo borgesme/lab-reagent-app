@@ -7,6 +7,7 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { LabsModule } from './labs/labs.module';
 import { RolesModule } from './roles/roles.module';
+import { ReagentsModule } from './reagents/reagents.module';
 import { JwtStrategy } from './common/strategies/jwt.strategy';
 import { JwtAuthGuard } from './common/guards/jwt.guard';
 import { RolesGuard } from './common/guards/roles.guard';
@@ -20,6 +21,7 @@ import { AuditInterceptor } from './common/interceptors/audit.interceptor';
     UsersModule,
     LabsModule,
     RolesModule,
+    ReagentsModule,
   ],
   controllers: [HealthController],
   providers: [
