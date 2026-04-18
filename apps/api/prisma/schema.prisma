@@ -1,0 +1,75 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum RoleCode {
+  PLAIN_USER
+  LAB_HEAD
+  REAGENT_ADMIN
+  SAFETY_OFFICER
+  SYS_ADMIN
+}
+
+model Lab {
+  id        String    @id @default(cuid())
+  name      String
+  building  String?
+  tenantId  String    @default("default")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+  users     User[]
+
+  @@index([tenantId])
+}
+
+model User {
+  id           String     @id @default(cuid())
+  email        String     @unique
+  name         String
+  phone        String?
+  passwordHash String
+  labId        String?
+  lab          Lab?       @relation(fields: [labId], references: [id])
+  roles        UserRole[]
+  wechatOpenId String?    @unique
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  deletedAt    DateTime?
+}
+
+model Role {
+  id    String     @id @default(cuid())
+  code  RoleCode   @unique
+  name  String
+  users UserRole[]
+}
+
+model UserRole {
+  userId String
+  roleId String
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  action     String
+  entityType String
+  entityId   String?
+  before     Json?
+  after      Json?
+  ip         String?
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([actorId, createdAt])
+}
