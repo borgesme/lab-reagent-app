@@ -1,0 +1,38 @@
+name: CI
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: lab
+          POSTGRES_PASSWORD: lab
+          POSTGRES_DB: lab_reagent
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U lab" --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://lab:lab@localhost:5432/lab_reagent
+      JWT_ACCESS_SECRET: ci_access
+      JWT_REFRESH_SECRET: ci_refresh
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @app/api prisma:generate
+      - run: pnpm --filter @app/api exec prisma migrate deploy
+      - run: pnpm --filter @app/api prisma:seed
+      - run: pnpm --filter @app/api test:e2e
+      - run: pnpm --filter @app/web test
+      - run: pnpm --filter @app/web build
+      - run: pnpm --filter @app/api build
