@@ -38,6 +38,19 @@ async function main() {
     update: {},
     create: { userId: admin.id, roleId: sysRole.id },
   });
+
+  const sampleReagents = [
+    { name: '丙酮', cas: '67-64-1', formula: 'C3H6O', category: '有机', hazardLevel: 'DANGEROUS' as const },
+    { name: '氯化钠', cas: '7647-14-5', formula: 'NaCl', category: '无机', hazardLevel: 'NORMAL' as const },
+    { name: '硫酸', cas: '7664-93-9', formula: 'H2SO4', category: '无机', hazardLevel: 'DANGEROUS' as const },
+  ];
+  for (const r of sampleReagents) {
+    await prisma.reagent.upsert({
+      where: { id: `seed-${r.cas}` },
+      update: {},
+      create: { id: `seed-${r.cas}`, ...r },
+    });
+  }
   console.log('seed done');
 }
 
