@@ -24,6 +24,7 @@ model Lab {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
   users     User[]
+  stocks    ReagentStock[]
 
   @@index([tenantId])
 }
@@ -72,4 +73,61 @@ model AuditLog {
 
   @@index([entityType, entityId])
   @@index([actorId, createdAt])
+}
+
+enum HazardLevel {
+  NORMAL
+  DANGEROUS
+  CONTROLLED
+}
+
+enum ControlType {
+  DRUG_PRECURSOR
+  EXPLOSIVE_PRECURSOR
+  TOXIC
+  NARCOTIC
+}
+
+model Reagent {
+  id            String         @id @default(cuid())
+  name          String
+  cas           String?
+  formula       String?
+  specification String?
+  category      String?
+  hazardLevel   HazardLevel    @default(NORMAL)
+  controlType   ControlType?
+  msdsFileUrl   String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  deletedAt     DateTime?
+  stocks        ReagentStock[]
+
+  @@index([name])
+  @@index([cas])
+}
+
+model ReagentStock {
+  id            String    @id @default(cuid())
+  reagentId     String
+  labId         String
+  batchNo       String?
+  mfgDate       DateTime?
+  expireDate    DateTime?
+  initialQty    Decimal   @db.Decimal(12, 3)
+  currentQty    Decimal   @db.Decimal(12, 3)
+  unit          String
+  location      String?
+  supplier      String?
+  purchasePrice Decimal?  @db.Decimal(12, 2)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+
+  reagent Reagent @relation(fields: [reagentId], references: [id])
+  lab     Lab     @relation(fields: [labId], references: [id])
+
+  @@index([reagentId])
+  @@index([labId])
+  @@index([expireDate])
 }
