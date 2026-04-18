@@ -25,23 +25,28 @@ model Lab {
   deletedAt DateTime?
   users     User[]
   stocks    ReagentStock[]
+  requests  Request[]
 
   @@index([tenantId])
 }
 
 model User {
-  id           String     @id @default(cuid())
-  email        String     @unique
-  name         String
-  phone        String?
-  passwordHash String
-  labId        String?
-  lab          Lab?       @relation(fields: [labId], references: [id])
-  roles        UserRole[]
-  wechatOpenId String?    @unique
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
-  deletedAt    DateTime?
+  id              String        @id @default(cuid())
+  email           String        @unique
+  name            String
+  phone           String?
+  passwordHash    String
+  labId           String?
+  lab             Lab?          @relation(fields: [labId], references: [id])
+  roles           UserRole[]
+  wechatOpenId    String?       @unique
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  deletedAt       DateTime?
+  requests        Request[]     @relation("RequestApplicant")
+  approvalsGiven  Approval[]    @relation("ApprovalBy")
+  issuedRecords   IssueRecord[] @relation("IssueRecordIssuer")
+  receivedRecords IssueRecord[] @relation("IssueRecordReceiver")
 }
 
 model Role {
@@ -102,6 +107,7 @@ model Reagent {
   updatedAt     DateTime       @updatedAt
   deletedAt     DateTime?
   stocks        ReagentStock[]
+  requests      Request[]
 
   @@index([name])
   @@index([cas])
@@ -124,10 +130,86 @@ model ReagentStock {
   updatedAt     DateTime  @updatedAt
   deletedAt     DateTime?
 
-  reagent Reagent @relation(fields: [reagentId], references: [id])
-  lab     Lab     @relation(fields: [labId], references: [id])
+  reagent  Reagent       @relation(fields: [reagentId], references: [id])
+  lab      Lab           @relation(fields: [labId], references: [id])
+  requests Request[]
+  issues   IssueRecord[]
 
   @@index([reagentId])
   @@index([labId])
   @@index([expireDate])
+}
+
+enum RequestStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  REJECTED
+  ISSUED
+  CANCELLED
+  CLOSED
+}
+
+enum ApprovalAction {
+  APPROVE
+  REJECT
+}
+
+model Request {
+  id             String        @id @default(cuid())
+  applicantId    String
+  labId          String
+  reagentId      String
+  stockId        String
+  quantity       Decimal       @db.Decimal(12, 3)
+  unit           String
+  purpose        String
+  projectRef     String?
+  useLocation    String?
+  status         RequestStatus @default(PENDING)
+  rejectedReason String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  applicant User         @relation("RequestApplicant", fields: [applicantId], references: [id])
+  lab       Lab          @relation(fields: [labId], references: [id])
+  reagent   Reagent      @relation(fields: [reagentId], references: [id])
+  stock     ReagentStock @relation(fields: [stockId], references: [id])
+  approvals Approval[]
+  issue     IssueRecord?
+
+  @@index([applicantId])
+  @@index([labId, status])
+  @@index([status])
+}
+
+model Approval {
+  id         String         @id @default(cuid())
+  requestId  String
+  approverId String
+  action     ApprovalAction
+  comment    String?
+  createdAt  DateTime       @default(now())
+
+  request  Request @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  approver User    @relation("ApprovalBy", fields: [approverId], references: [id])
+
+  @@index([requestId])
+}
+
+model IssueRecord {
+  id         String   @id @default(cuid())
+  requestId  String   @unique
+  issuerId   String
+  receiverId String
+  actualQty  Decimal  @db.Decimal(12, 3)
+  stockId    String
+  createdAt  DateTime @default(now())
+
+  request  Request      @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  issuer   User         @relation("IssueRecordIssuer", fields: [issuerId], references: [id])
+  receiver User         @relation("IssueRecordReceiver", fields: [receiverId], references: [id])
+  stock    ReagentStock @relation(fields: [stockId], references: [id])
+
+  @@index([stockId])
 }
