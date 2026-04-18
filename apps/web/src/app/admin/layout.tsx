@@ -25,6 +25,12 @@ export default function AdminLayout({
           <Link href="/admin/stocks" className="block">
             库存
           </Link>
+          <Link href="/approvals" className="block">
+            审批
+          </Link>
+          <Link href="/admin/issues" className="block">
+            发放
+          </Link>
         </aside>
         <main className="flex-1 p-6">{children}</main>
       </div>
