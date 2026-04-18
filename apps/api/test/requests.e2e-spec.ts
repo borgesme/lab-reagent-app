@@ -248,4 +248,119 @@ describe('Requests', () => {
       expect(r.body.request.rejectedReason).toBe('用途不明');
     });
   });
+
+  describe('issues', () => {
+    let approvedRequestId: string;
+    const approvedQty = '25';
+
+    beforeAll(async () => {
+      const create = await request(app.getHttpServer())
+        .post('/requests')
+        .set('Authorization', `Bearer ${plainToken}`)
+        .send({
+          reagentId,
+          stockId,
+          quantity: approvedQty,
+          unit: 'mL',
+          purpose: '待发放',
+        });
+      approvedRequestId = create.body.id;
+      const lh = await prisma.user.findUnique({
+        where: { email: 'labhead@lab.local' },
+      });
+      if (!lh) throw new Error('labhead fixture missing');
+      const lhLogin = await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({ email: 'labhead@lab.local', password: 'pass1234' });
+      await request(app.getHttpServer())
+        .post(`/requests/${approvedRequestId}/approvals`)
+        .set('Authorization', `Bearer ${lhLogin.body.accessToken}`)
+        .send({ action: 'APPROVE' });
+    });
+
+    it('plain user cannot issue', async () => {
+      const r = await request(app.getHttpServer())
+        .post(`/requests/${approvedRequestId}/issues`)
+        .set('Authorization', `Bearer ${plainToken}`)
+        .send({ actualQty: approvedQty });
+      expect(r.status).toBe(403);
+    });
+
+    it('admin issues approved request and decrements stock', async () => {
+      const stockBefore = await prisma.reagentStock.findUnique({
+        where: { id: stockId },
+      });
+      const qtyBefore = stockBefore!.currentQty.toString();
+
+      const r = await request(app.getHttpServer())
+        .post(`/requests/${approvedRequestId}/issues`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ actualQty: approvedQty });
+      expect(r.status).toBe(201);
+      expect(r.body.request.status).toBe('ISSUED');
+      expect(r.body.issue.actualQty).toBe(approvedQty);
+      expect(r.body.issue.receiverId).toBeDefined();
+
+      const stockAfter = await prisma.reagentStock.findUnique({
+        where: { id: stockId },
+      });
+      const delta = Number(qtyBefore) - Number(stockAfter!.currentQty);
+      expect(delta).toBeCloseTo(Number(approvedQty), 3);
+    });
+
+    it('cannot issue PENDING request', async () => {
+      const create = await request(app.getHttpServer())
+        .post('/requests')
+        .set('Authorization', `Bearer ${plainToken}`)
+        .send({
+          reagentId,
+          stockId,
+          quantity: '5',
+          unit: 'mL',
+          purpose: 'pending not issuable',
+        });
+      const r = await request(app.getHttpServer())
+        .post(`/requests/${create.body.id}/issues`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ actualQty: '5' });
+      expect(r.status).toBe(400);
+    });
+
+    it('rejects issue when actualQty exceeds current stock', async () => {
+      const create = await request(app.getHttpServer())
+        .post('/requests')
+        .set('Authorization', `Bearer ${plainToken}`)
+        .send({
+          reagentId,
+          stockId,
+          quantity: '10',
+          unit: 'mL',
+          purpose: '库存不足路径',
+        });
+      const lhLogin = await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({ email: 'labhead@lab.local', password: 'pass1234' });
+      await request(app.getHttpServer())
+        .post(`/requests/${create.body.id}/approvals`)
+        .set('Authorization', `Bearer ${lhLogin.body.accessToken}`)
+        .send({ action: 'APPROVE' });
+
+      await prisma.reagentStock.update({
+        where: { id: stockId },
+        data: { currentQty: '1' },
+      });
+
+      const r = await request(app.getHttpServer())
+        .post(`/requests/${create.body.id}/issues`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ actualQty: '10' });
+      expect(r.status).toBe(400);
+      expect(r.body.message).toMatch(/stock|库存/i);
+
+      await prisma.reagentStock.update({
+        where: { id: stockId },
+        data: { currentQty: '1000' },
+      });
+    });
+  });
 });
