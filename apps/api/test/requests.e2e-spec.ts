@@ -159,4 +159,93 @@ describe('Requests', () => {
       .set('Authorization', `Bearer ${otherLogin.body.accessToken}`);
     expect(r.status).toBe(403);
   });
+
+  describe('approvals', () => {
+    let labHeadToken: string;
+    let labHeadId: string;
+    let pendingRequestId: string;
+
+    beforeAll(async () => {
+      await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({ email: 'labhead@lab.local', name: 'LabHead', password: 'pass1234' });
+      const u = await prisma.user.findUnique({ where: { email: 'labhead@lab.local' } });
+      labHeadId = u!.id;
+      const labHeadRole = await prisma.role.findUniqueOrThrow({
+        where: { code: 'LAB_HEAD' },
+      });
+      await prisma.userRole.upsert({
+        where: { userId_roleId: { userId: labHeadId, roleId: labHeadRole.id } },
+        update: {},
+        create: { userId: labHeadId, roleId: labHeadRole.id },
+      });
+      await prisma.user.update({
+        where: { id: labHeadId },
+        data: { labId: 'lab-default' },
+      });
+      const login = await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({ email: 'labhead@lab.local', password: 'pass1234' });
+      labHeadToken = login.body.accessToken;
+
+      const create = await request(app.getHttpServer())
+        .post('/requests')
+        .set('Authorization', `Bearer ${plainToken}`)
+        .send({
+          reagentId,
+          stockId,
+          quantity: '20',
+          unit: 'mL',
+          purpose: '待审批测试',
+        });
+      pendingRequestId = create.body.id;
+    });
+
+    it('plain user cannot approve', async () => {
+      const r = await request(app.getHttpServer())
+        .post(`/requests/${pendingRequestId}/approvals`)
+        .set('Authorization', `Bearer ${plainToken}`)
+        .send({ action: 'APPROVE' });
+      expect(r.status).toBe(403);
+    });
+
+    it('lab head approves', async () => {
+      const r = await request(app.getHttpServer())
+        .post(`/requests/${pendingRequestId}/approvals`)
+        .set('Authorization', `Bearer ${labHeadToken}`)
+        .send({ action: 'APPROVE', comment: '通过' });
+      expect(r.status).toBe(201);
+      expect(r.body.request.status).toBe('APPROVED');
+      expect(r.body.approval.action).toBe('APPROVE');
+      expect(r.body.approval.approverId).toBe(labHeadId);
+    });
+
+    it('cannot approve already-approved request', async () => {
+      const r = await request(app.getHttpServer())
+        .post(`/requests/${pendingRequestId}/approvals`)
+        .set('Authorization', `Bearer ${labHeadToken}`)
+        .send({ action: 'APPROVE' });
+      expect(r.status).toBe(400);
+    });
+
+    it('lab head rejects new request with reason', async () => {
+      const create = await request(app.getHttpServer())
+        .post('/requests')
+        .set('Authorization', `Bearer ${plainToken}`)
+        .send({
+          reagentId,
+          stockId,
+          quantity: '30',
+          unit: 'mL',
+          purpose: '将被拒绝',
+        });
+      const r = await request(app.getHttpServer())
+        .post(`/requests/${create.body.id}/approvals`)
+        .set('Authorization', `Bearer ${labHeadToken}`)
+        .send({ action: 'REJECT', comment: '用途不明' });
+      expect(r.status).toBe(201);
+      expect(r.body.request.status).toBe('REJECTED');
+      expect(r.body.request.rejectedReason).toBe('用途不明');
+    });
+  });
 });
