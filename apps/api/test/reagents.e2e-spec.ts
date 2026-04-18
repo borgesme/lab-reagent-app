@@ -16,6 +16,9 @@ describe('Reagents', () => {
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
     await app.init();
     prisma = app.get(PrismaService);
+    await prisma.issueRecord.deleteMany({});
+    await prisma.approval.deleteMany({});
+    await prisma.request.deleteMany({});
     await prisma.reagentStock.deleteMany({});
     await prisma.reagent.deleteMany({ where: { name: { startsWith: 'TestReagent' } } });
 
