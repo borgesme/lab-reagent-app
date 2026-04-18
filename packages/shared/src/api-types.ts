@@ -50,3 +50,49 @@ export interface StockSummary {
   location?: string | null;
   supplier?: string | null;
 }
+
+export type RequestStatus =
+  | 'DRAFT'
+  | 'PENDING'
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'ISSUED'
+  | 'CANCELLED'
+  | 'CLOSED';
+
+export type ApprovalAction = 'APPROVE' | 'REJECT';
+
+export interface RequestSummary {
+  id: string;
+  applicantId: string;
+  labId: string;
+  reagentId: string;
+  stockId: string;
+  quantity: string;
+  unit: string;
+  purpose: string;
+  projectRef?: string | null;
+  useLocation?: string | null;
+  status: RequestStatus;
+  rejectedReason?: string | null;
+  createdAt: string;
+}
+
+export interface ApprovalSummary {
+  id: string;
+  requestId: string;
+  approverId: string;
+  action: ApprovalAction;
+  comment?: string | null;
+  createdAt: string;
+}
+
+export interface IssueSummary {
+  id: string;
+  requestId: string;
+  issuerId: string;
+  receiverId: string;
+  stockId: string;
+  actualQty: string;
+  createdAt: string;
+}
