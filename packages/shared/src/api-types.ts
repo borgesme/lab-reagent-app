@@ -17,3 +17,36 @@ export interface UserSummary {
   labId?: string | null;
   roles: RoleCode[];
 }
+
+export type HazardLevel = 'NORMAL' | 'DANGEROUS' | 'CONTROLLED';
+export type ControlType =
+  | 'DRUG_PRECURSOR'
+  | 'EXPLOSIVE_PRECURSOR'
+  | 'TOXIC'
+  | 'NARCOTIC';
+
+export interface ReagentSummary {
+  id: string;
+  name: string;
+  cas?: string | null;
+  formula?: string | null;
+  specification?: string | null;
+  category?: string | null;
+  hazardLevel: HazardLevel;
+  controlType?: ControlType | null;
+  msdsFileUrl?: string | null;
+}
+
+export interface StockSummary {
+  id: string;
+  reagentId: string;
+  labId: string;
+  batchNo?: string | null;
+  mfgDate?: string | null;
+  expireDate?: string | null;
+  initialQty: string;
+  currentQty: string;
+  unit: string;
+  location?: string | null;
+  supplier?: string | null;
+}
