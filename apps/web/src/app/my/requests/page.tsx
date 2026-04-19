@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { isControlled } from '@app/shared';
 import { apiFetch } from '@/lib/api-client';
 import { useAuth } from '@/lib/auth-store';
 import { RequireAuth } from '@/components/RequireAuth';
@@ -7,6 +8,8 @@ import { RequireAuth } from '@/components/RequireAuth';
 interface Reagent {
   id: string;
   name: string;
+  hazardLevel?: 'NORMAL' | 'DANGEROUS' | 'CONTROLLED';
+  controlType?: string | null;
 }
 
 interface Stock {
@@ -25,7 +28,7 @@ interface RequestItem {
   purpose: string;
   createdAt: string;
   rejectedReason?: string | null;
-  reagent: { name: string };
+  reagent: { name: string; hazardLevel?: string; controlType?: string | null };
   stock: { batchNo?: string | null };
 }
 
@@ -41,6 +44,8 @@ export default function MyRequestsPage() {
   const [quantity, setQuantity] = useState('');
   const [unit, setUnit] = useState('mL');
   const [purpose, setPurpose] = useState('');
+  const [projectRef, setProjectRef] = useState('');
+  const [useLocation, setUseLocation] = useState('');
 
   async function refresh() {
     if (!token) return;
@@ -64,18 +69,37 @@ export default function MyRequestsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
+  const reagent = reagents.find((x) => x.id === reagentId);
+  const controlled = reagent
+    ? isControlled({
+        hazardLevel: (reagent.hazardLevel ?? 'NORMAL') as any,
+        controlType: (reagent.controlType ?? null) as any,
+      })
+    : false;
+  const purposeTooShort = controlled && purpose.trim().length < 50;
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     try {
       await apiFetch('/requests', {
         method: 'POST',
         token,
-        body: { reagentId, stockId, quantity, unit, purpose },
+        body: {
+          reagentId,
+          stockId,
+          quantity,
+          unit,
+          purpose,
+          projectRef: projectRef || undefined,
+          useLocation: useLocation || undefined,
+        },
       });
       setReagentId('');
       setStockId('');
       setQuantity('');
       setPurpose('');
+      setProjectRef('');
+      setUseLocation('');
       refresh();
     } catch (e: any) {
       setErr(e.message);
@@ -118,6 +142,9 @@ export default function MyRequestsPage() {
             {reagents.map((r) => (
               <option key={r.id} value={r.id}>
                 {r.name}
+                {r.hazardLevel === 'CONTROLLED' || r.controlType
+                  ? '（管控）'
+                  : ''}
               </option>
             ))}
           </select>
@@ -149,14 +176,43 @@ export default function MyRequestsPage() {
             onChange={(e) => setUnit(e.target.value)}
             required
           />
-          <input
-            className="border p-2 col-span-5"
-            placeholder="用途（必填）"
+          {controlled && (
+            <div className="col-span-6 bg-red-100 text-red-800 text-sm p-2 rounded">
+              管控试剂：用途 ≥50 字，项目号、使用地点必填
+            </div>
+          )}
+          <textarea
+            className={
+              'border p-2 col-span-6 ' +
+              (purposeTooShort ? 'border-red-500' : '')
+            }
+            rows={controlled ? 3 : 2}
+            placeholder={
+              controlled ? '用途（管控试剂必填 ≥50 字）' : '用途（必填）'
+            }
             value={purpose}
             onChange={(e) => setPurpose(e.target.value)}
             required
           />
-          <button className="bg-blue-600 text-white col-span-1">提交</button>
+          <input
+            className="border p-2 col-span-3"
+            placeholder={controlled ? '项目号（管控必填）' : '项目号（可选）'}
+            value={projectRef}
+            onChange={(e) => setProjectRef(e.target.value)}
+            required={controlled}
+          />
+          <input
+            className="border p-2 col-span-3"
+            placeholder={
+              controlled ? '使用地点（管控必填）' : '使用地点（可选）'
+            }
+            value={useLocation}
+            onChange={(e) => setUseLocation(e.target.value)}
+            required={controlled}
+          />
+          <button className="bg-blue-600 text-white col-span-6 py-2">
+            提交
+          </button>
         </form>
 
         <table className="w-full border">
@@ -172,35 +228,47 @@ export default function MyRequestsPage() {
             </tr>
           </thead>
           <tbody>
-            {items.map((r) => (
-              <tr key={r.id} className="border-t">
-                <td className="p-2">{r.reagent.name}</td>
-                <td className="p-2">{r.stock.batchNo ?? '-'}</td>
-                <td className="p-2">
-                  {r.quantity} {r.unit}
-                </td>
-                <td className="p-2">{r.purpose}</td>
-                <td className="p-2">
-                  {r.status}
-                  {r.status === 'REJECTED' && r.rejectedReason && (
-                    <span className="text-red-600 ml-1">
-                      ({r.rejectedReason})
-                    </span>
-                  )}
-                </td>
-                <td className="p-2">{r.createdAt.slice(0, 16).replace('T', ' ')}</td>
-                <td className="p-2">
-                  {r.status === 'PENDING' && (
-                    <button
-                      className="text-red-600 underline"
-                      onClick={() => onCancel(r.id)}
-                    >
-                      取消
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
+            {items.map((r) => {
+              const ctrl =
+                r.reagent.hazardLevel === 'CONTROLLED' ||
+                !!r.reagent.controlType;
+              return (
+                <tr key={r.id} className="border-t">
+                  <td className="p-2">
+                    {r.reagent.name}
+                    {ctrl && (
+                      <span className="ml-1 text-red-600 text-xs">[管控]</span>
+                    )}
+                  </td>
+                  <td className="p-2">{r.stock.batchNo ?? '-'}</td>
+                  <td className="p-2">
+                    {r.quantity} {r.unit}
+                  </td>
+                  <td className="p-2">{r.purpose}</td>
+                  <td className="p-2">
+                    {r.status}
+                    {r.status === 'REJECTED' && r.rejectedReason && (
+                      <span className="text-red-600 ml-1">
+                        ({r.rejectedReason})
+                      </span>
+                    )}
+                  </td>
+                  <td className="p-2">
+                    {r.createdAt.slice(0, 16).replace('T', ' ')}
+                  </td>
+                  <td className="p-2">
+                    {r.status === 'PENDING' && (
+                      <button
+                        className="text-red-600 underline"
+                        onClick={() => onCancel(r.id)}
+                      >
+                        取消
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </main>
