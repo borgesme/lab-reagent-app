@@ -47,6 +47,7 @@ model User {
   approvalsGiven  Approval[]    @relation("ApprovalBy")
   issuedRecords   IssueRecord[] @relation("IssueRecordIssuer")
   receivedRecords IssueRecord[] @relation("IssueRecordReceiver")
+  witnessRecords  IssueRecord[] @relation("IssueRecordWitness")
 }
 
 model Role {
@@ -188,28 +189,46 @@ model Approval {
   requestId  String
   approverId String
   action     ApprovalAction
+  level      Int            @default(1)
   comment    String?
   createdAt  DateTime       @default(now())
 
   request  Request @relation(fields: [requestId], references: [id], onDelete: Cascade)
   approver User    @relation("ApprovalBy", fields: [approverId], references: [id])
 
+  @@unique([requestId, level, action])
   @@index([requestId])
 }
 
 model IssueRecord {
-  id         String   @id @default(cuid())
-  requestId  String   @unique
-  issuerId   String
-  receiverId String
-  actualQty  Decimal  @db.Decimal(12, 3)
-  stockId    String
-  createdAt  DateTime @default(now())
+  id               String   @id @default(cuid())
+  requestId        String   @unique
+  issuerId         String
+  receiverId       String
+  witnessId        String?
+  actualQty        Decimal  @db.Decimal(12, 3)
+  stockId          String
+  signatureDataUrl String?
+  createdAt        DateTime @default(now())
 
   request  Request      @relation(fields: [requestId], references: [id], onDelete: Cascade)
   issuer   User         @relation("IssueRecordIssuer", fields: [issuerId], references: [id])
   receiver User         @relation("IssueRecordReceiver", fields: [receiverId], references: [id])
+  witness  User?        @relation("IssueRecordWitness", fields: [witnessId], references: [id])
   stock    ReagentStock @relation(fields: [stockId], references: [id])
 
   @@index([stockId])
+  @@index([witnessId])
+}
+
+model ControlledLedgerSnapshot {
+  id         String   @id @default(cuid())
+  labId      String
+  yearMonth  String
+  csvContent String
+  rowCount   Int
+  createdAt  DateTime @default(now())
+
+  @@unique([labId, yearMonth])
+  @@index([labId])
 }
