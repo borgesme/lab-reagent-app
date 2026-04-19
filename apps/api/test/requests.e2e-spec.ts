@@ -353,7 +353,123 @@ describe('Requests', () => {
         .send({ action: 'REJECT', comment: '用途不明' });
       expect(r.status).toBe(201);
       expect(r.body.request.status).toBe('REJECTED');
-      expect(r.body.request.rejectedReason).toBe('用途不明');
+      expect(r.body.request.rejectedReason).toBe('L1: 用途不明');
+    });
+
+    describe('two-level for controlled', () => {
+      let safetyToken: string;
+      let safetyId: string;
+      let ctrlPendingId: string;
+
+      beforeAll(async () => {
+        await request(app.getHttpServer())
+          .post('/auth/register')
+          .send({ email: 'safety@lab.local', name: 'Safety', password: 'pass1234' });
+        const u = await prisma.user.findUnique({ where: { email: 'safety@lab.local' } });
+        safetyId = u!.id;
+        const role = await prisma.role.findUniqueOrThrow({ where: { code: 'SAFETY_OFFICER' } });
+        await prisma.userRole.upsert({
+          where: { userId_roleId: { userId: safetyId, roleId: role.id } },
+          update: {},
+          create: { userId: safetyId, roleId: role.id },
+        });
+        await prisma.user.update({
+          where: { id: safetyId },
+          data: { labId: 'lab-default' },
+        });
+        const login = await request(app.getHttpServer())
+          .post('/auth/login')
+          .send({ email: 'safety@lab.local', password: 'pass1234' });
+        safetyToken = login.body.accessToken;
+
+        const create = await request(app.getHttpServer())
+          .post('/requests')
+          .set('Authorization', `Bearer ${plainToken}`)
+          .send({
+            reagentId: 'reagent-ctrl-test',
+            stockId: 'stock-ctrl-test',
+            quantity: '2',
+            unit: 'g',
+            purpose: '这是一段足够长的管控试剂用途说明必须超过五十字的详细描述内容一二三四五六七八九十ABCDEF测试用例合规',
+            projectRef: 'P-ctrl',
+            useLocation: 'Lab-A',
+          });
+        ctrlPendingId = create.body.id;
+      });
+
+      it('level=2 before level=1 returns 400', async () => {
+        const r = await request(app.getHttpServer())
+          .post(`/requests/${ctrlPendingId}/approvals`)
+          .set('Authorization', `Bearer ${safetyToken}`)
+          .send({ action: 'APPROVE', level: 2 });
+        expect(r.status).toBe(400);
+        expect(r.body.message).toMatch(/level=1/);
+      });
+
+      it('LAB_HEAD level=1 APPROVE keeps PENDING', async () => {
+        const r = await request(app.getHttpServer())
+          .post(`/requests/${ctrlPendingId}/approvals`)
+          .set('Authorization', `Bearer ${labHeadToken}`)
+          .send({ action: 'APPROVE', level: 1 });
+        expect(r.status).toBe(201);
+        expect(r.body.request.status).toBe('PENDING');
+        expect(r.body.approval.level).toBe(1);
+      });
+
+      it('LAB_HEAD cannot submit level=2 → 403', async () => {
+        const r = await request(app.getHttpServer())
+          .post(`/requests/${ctrlPendingId}/approvals`)
+          .set('Authorization', `Bearer ${labHeadToken}`)
+          .send({ action: 'APPROVE', level: 2 });
+        expect(r.status).toBe(403);
+      });
+
+      it('SAFETY_OFFICER level=2 APPROVE → APPROVED', async () => {
+        const r = await request(app.getHttpServer())
+          .post(`/requests/${ctrlPendingId}/approvals`)
+          .set('Authorization', `Bearer ${safetyToken}`)
+          .send({ action: 'APPROVE', level: 2 });
+        expect(r.status).toBe(201);
+        expect(r.body.request.status).toBe('APPROVED');
+        expect(r.body.approval.level).toBe(2);
+      });
+
+      it('SAFETY_OFFICER on non-controlled level=1 → 403', async () => {
+        const plainCreate = await request(app.getHttpServer())
+          .post('/requests')
+          .set('Authorization', `Bearer ${plainToken}`)
+          .send({
+            reagentId,
+            stockId,
+            quantity: '3',
+            unit: 'mL',
+            purpose: '安全员越权测试',
+          });
+        const r = await request(app.getHttpServer())
+          .post(`/requests/${plainCreate.body.id}/approvals`)
+          .set('Authorization', `Bearer ${safetyToken}`)
+          .send({ action: 'APPROVE', level: 1 });
+        expect(r.status).toBe(403);
+      });
+
+      it('level=2 on non-controlled returns 400', async () => {
+        const plainCreate = await request(app.getHttpServer())
+          .post('/requests')
+          .set('Authorization', `Bearer ${plainToken}`)
+          .send({
+            reagentId,
+            stockId,
+            quantity: '3',
+            unit: 'mL',
+            purpose: 'level 2 对普通无意义',
+          });
+        const r = await request(app.getHttpServer())
+          .post(`/requests/${plainCreate.body.id}/approvals`)
+          .set('Authorization', `Bearer ${safetyToken}`)
+          .send({ action: 'APPROVE', level: 2 });
+        expect(r.status).toBe(400);
+        expect(r.body.message).toMatch(/level=2 not applicable/);
+      });
     });
   });
 
