@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma, RequestStatus } from '@prisma/client';
+import { isControlled } from '@app/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { IssueRequestDto } from './dto/issue-request.dto';
 import { ActorContext } from './requests.service';
@@ -18,12 +19,53 @@ export class IssuesService {
     dto: IssueRequestDto,
     actor: ActorContext,
   ) {
-    const req = await this.prisma.request.findUnique({ where: { id: requestId } });
+    const req = await this.prisma.request.findUnique({
+      where: { id: requestId },
+      include: { reagent: true },
+    });
     if (!req) throw new NotFoundException();
     if (req.status !== RequestStatus.APPROVED) {
       throw new BadRequestException(`request is ${req.status}, not APPROVED`);
     }
     await this.assertIssuer(req.labId, actor);
+
+    const controlled = isControlled(req.reagent);
+
+    if (controlled) {
+      if (!dto.witnessId) {
+        throw new BadRequestException(
+          'witnessId is required for controlled reagents',
+        );
+      }
+      if (
+        !dto.signatureDataUrl ||
+        !dto.signatureDataUrl.startsWith('data:image/')
+      ) {
+        throw new BadRequestException(
+          'signatureDataUrl (data:image/*) required',
+        );
+      }
+      if (dto.witnessId === actor.sub) {
+        throw new BadRequestException('witness must differ from issuer');
+      }
+      const witness = await this.prisma.user.findUnique({
+        where: { id: dto.witnessId },
+        include: { roles: { include: { role: true } } },
+      });
+      if (!witness) throw new BadRequestException('witness not found');
+      if (witness.labId !== req.labId) {
+        throw new BadRequestException('witness not in same lab');
+      }
+      const witnessRoles = witness.roles.map((r) => r.role.code);
+      const allowed = witnessRoles.some(
+        (c) => c === 'LAB_HEAD' || c === 'REAGENT_ADMIN',
+      );
+      if (!allowed) {
+        throw new BadRequestException(
+          'witness must be LAB_HEAD or REAGENT_ADMIN',
+        );
+      }
+    }
 
     const actualQty = new Prisma.Decimal(dto.actualQty);
     const receiverId = dto.receiverId ?? req.applicantId;
@@ -44,8 +86,10 @@ export class IssuesService {
           requestId,
           issuerId: actor.sub,
           receiverId,
+          witnessId: dto.witnessId ?? null,
           actualQty: dto.actualQty,
           stockId: req.stockId,
+          signatureDataUrl: dto.signatureDataUrl ?? null,
         },
       });
 

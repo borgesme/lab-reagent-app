@@ -586,5 +586,138 @@ describe('Requests', () => {
         data: { currentQty: '1000' },
       });
     });
+
+    describe('controlled double-witness', () => {
+      let safetyToken: string;
+      let labHeadToken2: string;
+      let labHeadId2: string;
+      let adminUserId: string;
+      let ctrlApprovedId: string;
+      const validSig =
+        'data:image/png;base64,iVBORw0KGgoAAAANS' + 'A'.repeat(64);
+
+      beforeAll(async () => {
+        const sfLogin = await request(app.getHttpServer())
+          .post('/auth/login')
+          .send({ email: 'safety@lab.local', password: 'pass1234' });
+        safetyToken = sfLogin.body.accessToken;
+
+        const lhLogin = await request(app.getHttpServer())
+          .post('/auth/login')
+          .send({ email: 'labhead@lab.local', password: 'pass1234' });
+        labHeadToken2 = lhLogin.body.accessToken;
+
+        const lh = await prisma.user.findUniqueOrThrow({
+          where: { email: 'labhead@lab.local' },
+        });
+        labHeadId2 = lh.id;
+
+        const admin = await prisma.user.findUniqueOrThrow({
+          where: { email: 'admin@lab.local' },
+        });
+        adminUserId = admin.id;
+        await prisma.user.update({
+          where: { id: adminUserId },
+          data: { labId: 'lab-default' },
+        });
+
+        await prisma.reagentStock.update({
+          where: { id: 'stock-ctrl-test' },
+          data: { currentQty: '500' },
+        });
+
+        const create = await request(app.getHttpServer())
+          .post('/requests')
+          .set('Authorization', `Bearer ${plainToken}`)
+          .send({
+            reagentId: 'reagent-ctrl-test',
+            stockId: 'stock-ctrl-test',
+            quantity: '4',
+            unit: 'g',
+            purpose:
+              '这是一段足够长的管控试剂用途说明必须超过五十字的详细描述内容一二三四五六七八九十ABCDEF测试用例合规',
+            projectRef: 'P-iss',
+            useLocation: 'Lab-A',
+          });
+        ctrlApprovedId = create.body.id;
+        await request(app.getHttpServer())
+          .post(`/requests/${ctrlApprovedId}/approvals`)
+          .set('Authorization', `Bearer ${labHeadToken2}`)
+          .send({ action: 'APPROVE', level: 1 });
+        await request(app.getHttpServer())
+          .post(`/requests/${ctrlApprovedId}/approvals`)
+          .set('Authorization', `Bearer ${safetyToken}`)
+          .send({ action: 'APPROVE', level: 2 });
+      });
+
+      it('rejects controlled issue missing witnessId', async () => {
+        const r = await request(app.getHttpServer())
+          .post(`/requests/${ctrlApprovedId}/issues`)
+          .set('Authorization', `Bearer ${adminToken}`)
+          .send({ actualQty: '4', signatureDataUrl: validSig });
+        expect(r.status).toBe(400);
+        expect(r.body.message).toMatch(/witnessId/);
+      });
+
+      it('rejects controlled issue missing signature', async () => {
+        const r = await request(app.getHttpServer())
+          .post(`/requests/${ctrlApprovedId}/issues`)
+          .set('Authorization', `Bearer ${adminToken}`)
+          .send({ actualQty: '4', witnessId: labHeadId2 });
+        expect(r.status).toBe(400);
+        expect(r.body.message).toMatch(/signature/i);
+      });
+
+      it('rejects when witness === issuer', async () => {
+        const r = await request(app.getHttpServer())
+          .post(`/requests/${ctrlApprovedId}/issues`)
+          .set('Authorization', `Bearer ${adminToken}`)
+          .send({
+            actualQty: '4',
+            witnessId: adminUserId,
+            signatureDataUrl: validSig,
+          });
+        expect(r.status).toBe(400);
+        expect(r.body.message).toMatch(/witness/);
+      });
+
+      it('rejects when witness has wrong role', async () => {
+        const r = await request(app.getHttpServer())
+          .post(`/requests/${ctrlApprovedId}/issues`)
+          .set('Authorization', `Bearer ${adminToken}`)
+          .send({
+            actualQty: '4',
+            witnessId: plainUserId,
+            signatureDataUrl: validSig,
+          });
+        expect(r.status).toBe(400);
+        expect(r.body.message).toMatch(/witness/);
+      });
+
+      it('accepts controlled issue with lab_head witness and decrements stock', async () => {
+        const ctrlStock = await prisma.reagentStock.findFirstOrThrow({
+          where: { batchNo: 'CtrlBatch-01' },
+        });
+        const before = Number(ctrlStock.currentQty);
+
+        const r = await request(app.getHttpServer())
+          .post(`/requests/${ctrlApprovedId}/issues`)
+          .set('Authorization', `Bearer ${adminToken}`)
+          .send({
+            actualQty: '4',
+            witnessId: labHeadId2,
+            signatureDataUrl: validSig,
+          });
+        expect(r.status).toBe(201);
+        expect(r.body.request.status).toBe('ISSUED');
+        expect(r.body.issue.witnessId).toBe(labHeadId2);
+        expect(r.body.issue.signatureDataUrl).toContain('data:image/');
+
+        const after = await prisma.reagentStock.findUniqueOrThrow({
+          where: { id: ctrlStock.id },
+        });
+        expect(before - Number(after.currentQty)).toBeCloseTo(4, 3);
+      });
+    });
   });
 });
