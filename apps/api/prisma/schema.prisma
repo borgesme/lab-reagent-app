@@ -26,6 +26,9 @@ model Lab {
   users     User[]
   stocks    ReagentStock[]
   requests  Request[]
+  purchaseRequests PurchaseRequest[]
+  purchaseBatches  PurchaseBatch[]
+  reagentConfigs   LabReagentConfig[]
 
   @@index([tenantId])
 }
@@ -48,6 +51,11 @@ model User {
   issuedRecords   IssueRecord[] @relation("IssueRecordIssuer")
   receivedRecords IssueRecord[] @relation("IssueRecordReceiver")
   witnessRecords  IssueRecord[] @relation("IssueRecordWitness")
+  purchaseRequests   PurchaseRequest[]  @relation("PurchaseApplicant")
+  purchaseBatches    PurchaseBatch[]    @relation("PurchaseBatchCreator")
+  purchaseApprovals  PurchaseApproval[] @relation("PurchaseApprover")
+  purchaseReceipts   PurchaseReceipt[]  @relation("PurchaseReceiver")
+  notifications      Notification[]     @relation("NotificationRecipient")
 }
 
 model Role {
@@ -109,6 +117,9 @@ model Reagent {
   deletedAt     DateTime?
   stocks        ReagentStock[]
   requests      Request[]
+  purchaseRequests PurchaseRequest[]
+  purchaseBatches  PurchaseBatch[]
+  reagentConfigs   LabReagentConfig[]
 
   @@index([name])
   @@index([cas])
@@ -135,6 +146,7 @@ model ReagentStock {
   lab      Lab           @relation(fields: [labId], references: [id])
   requests Request[]
   issues   IssueRecord[]
+  purchaseReceipt PurchaseReceipt?
 
   @@index([reagentId])
   @@index([labId])
@@ -231,4 +243,133 @@ model ControlledLedgerSnapshot {
 
   @@unique([labId, yearMonth])
   @@index([labId])
+}
+
+enum PurchaseRequestStatus {
+  PENDING
+  MERGED
+  CANCELLED
+}
+
+enum PurchaseBatchStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  RECEIVED
+  CANCELLED
+}
+
+enum NotificationType {
+  ALERT_EXPIRING
+  ALERT_LOW_STOCK
+  ALERT_RECONCILE
+  PURCHASE_APPROVED
+  PURCHASE_REJECTED
+  PURCHASE_RECEIVED
+}
+
+model PurchaseRequest {
+  id          String                @id @default(cuid())
+  applicantId String
+  labId       String
+  reagentId   String
+  quantity    Decimal               @db.Decimal(12, 3)
+  unit        String
+  reason      String
+  status      PurchaseRequestStatus @default(PENDING)
+  batchId     String?
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+
+  applicant User           @relation("PurchaseApplicant", fields: [applicantId], references: [id])
+  lab       Lab            @relation(fields: [labId], references: [id])
+  reagent   Reagent        @relation(fields: [reagentId], references: [id])
+  batch     PurchaseBatch? @relation(fields: [batchId], references: [id])
+
+  @@index([labId, status])
+  @@index([batchId])
+}
+
+model PurchaseBatch {
+  id             String              @id @default(cuid())
+  labId          String
+  reagentId      String
+  totalQty       Decimal             @db.Decimal(12, 3)
+  unit           String
+  status         PurchaseBatchStatus @default(PENDING)
+  rejectedReason String?
+  createdBy      String
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  lab       Lab                @relation(fields: [labId], references: [id])
+  reagent   Reagent            @relation(fields: [reagentId], references: [id])
+  creator   User               @relation("PurchaseBatchCreator", fields: [createdBy], references: [id])
+  items     PurchaseRequest[]
+  approvals PurchaseApproval[]
+  receipt   PurchaseReceipt?
+
+  @@index([labId, status])
+}
+
+model PurchaseApproval {
+  id         String         @id @default(cuid())
+  batchId    String
+  approverId String
+  action     ApprovalAction
+  comment    String?
+  createdAt  DateTime       @default(now())
+
+  batch    PurchaseBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  approver User          @relation("PurchaseApprover", fields: [approverId], references: [id])
+
+  @@index([batchId])
+}
+
+model PurchaseReceipt {
+  id            String   @id @default(cuid())
+  batchId       String   @unique
+  stockId       String   @unique
+  receivedBy    String
+  receivedAt    DateTime @default(now())
+  supplier      String?
+  purchasePrice Decimal? @db.Decimal(12, 2)
+
+  batch    PurchaseBatch @relation(fields: [batchId], references: [id])
+  stock    ReagentStock  @relation(fields: [stockId], references: [id])
+  receiver User          @relation("PurchaseReceiver", fields: [receivedBy], references: [id])
+}
+
+model LabReagentConfig {
+  id                String   @id @default(cuid())
+  labId             String
+  reagentId         String
+  safetyStock       Decimal  @db.Decimal(12, 3)
+  expireWarningDays Int      @default(30)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  lab     Lab     @relation(fields: [labId], references: [id])
+  reagent Reagent @relation(fields: [reagentId], references: [id])
+
+  @@unique([labId, reagentId])
+  @@index([labId])
+}
+
+model Notification {
+  id          String           @id @default(cuid())
+  recipientId String
+  labId       String?
+  type        NotificationType
+  title       String
+  body        String
+  payload     Json?
+  readAt      DateTime?
+  emailedAt   DateTime?
+  createdAt   DateTime         @default(now())
+
+  recipient User @relation("NotificationRecipient", fields: [recipientId], references: [id])
+
+  @@index([recipientId, readAt])
+  @@index([labId, type])
 }
