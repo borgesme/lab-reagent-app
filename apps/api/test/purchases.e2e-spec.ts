@@ -370,4 +370,83 @@ describe('Purchases', () => {
       });
     });
   });
+
+  describe('POST /purchases/batches/:id/receipt', () => {
+    async function approvedBatch() {
+      const r = await request(app.getHttpServer())
+        .post('/purchases')
+        .set('Authorization', `Bearer ${plainToken}`)
+        .send({ reagentId, quantity: '50', unit: 'mL', reason: 'receive' });
+      const m = await request(app.getHttpServer())
+        .post('/purchases/batches')
+        .set('Authorization', `Bearer ${reagentAdminToken}`)
+        .send({ requestIds: [r.body.id] });
+      await request(app.getHttpServer())
+        .post(`/purchases/batches/${m.body.id}/approve`)
+        .set('Authorization', `Bearer ${labHeadToken}`)
+        .send({ action: 'APPROVE' });
+      return m.body.id as string;
+    }
+
+    it('creates ReagentStock and Receipt, notifies applicants', async () => {
+      await prisma.notification.deleteMany({ where: { recipientId: plainId } });
+      const batchId = await approvedBatch();
+      const res = await request(app.getHttpServer())
+        .post(`/purchases/batches/${batchId}/receipt`)
+        .set('Authorization', `Bearer ${reagentAdminToken}`)
+        .send({
+          actualQty: '50',
+          batchNo: 'P5RCV-001',
+          supplier: 'ACME',
+          purchasePrice: '123.45',
+          location: 'A-01',
+        });
+      expect(res.status).toBe(201);
+      expect(res.body.stockId).toBeDefined();
+
+      const stock = await prisma.reagentStock.findUnique({
+        where: { id: res.body.stockId },
+      });
+      expect(stock?.batchNo).toBe('P5RCV-001');
+      expect(Number(stock?.initialQty)).toBe(50);
+      expect(Number(stock?.currentQty)).toBe(50);
+
+      const b = await prisma.purchaseBatch.findUnique({ where: { id: batchId } });
+      expect(b?.status).toBe('RECEIVED');
+
+      const notif = await prisma.notification.findFirst({
+        where: { recipientId: plainId, type: 'PURCHASE_RECEIVED' },
+      });
+      expect(notif).not.toBeNull();
+    });
+
+    it('409 on second receipt', async () => {
+      const batchId = await approvedBatch();
+      await request(app.getHttpServer())
+        .post(`/purchases/batches/${batchId}/receipt`)
+        .set('Authorization', `Bearer ${reagentAdminToken}`)
+        .send({ actualQty: '1' });
+      const res = await request(app.getHttpServer())
+        .post(`/purchases/batches/${batchId}/receipt`)
+        .set('Authorization', `Bearer ${reagentAdminToken}`)
+        .send({ actualQty: '1' });
+      expect(res.status).toBe(409);
+    });
+
+    it('409 when batch not APPROVED', async () => {
+      const r = await request(app.getHttpServer())
+        .post('/purchases')
+        .set('Authorization', `Bearer ${plainToken}`)
+        .send({ reagentId, quantity: '10', unit: 'mL', reason: 't' });
+      const m = await request(app.getHttpServer())
+        .post('/purchases/batches')
+        .set('Authorization', `Bearer ${reagentAdminToken}`)
+        .send({ requestIds: [r.body.id] });
+      const res = await request(app.getHttpServer())
+        .post(`/purchases/batches/${m.body.id}/receipt`)
+        .set('Authorization', `Bearer ${reagentAdminToken}`)
+        .send({ actualQty: '10' });
+      expect(res.status).toBe(409);
+    });
+  });
 });

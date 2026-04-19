@@ -12,6 +12,7 @@ import { BatchesService } from './batches.service';
 import { CreatePurchaseDto } from './dto/create-purchase.dto';
 import { MergeBatchDto } from './dto/merge-batch.dto';
 import { ApproveBatchDto } from './dto/approve-batch.dto';
+import { ReceiptBatchDto } from './dto/receipt-batch.dto';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Audit } from '../common/decorators/audit.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -64,5 +65,16 @@ export class PurchasesController {
     @CurrentUser() user: any,
   ) {
     return this.batches.approve(id, dto, user);
+  }
+
+  @Post('batches/:id/receipt')
+  @Roles('REAGENT_ADMIN', 'SYS_ADMIN')
+  @Audit({ action: 'PURCHASE_RECEIVE', entityType: 'PurchaseReceipt' })
+  receive(
+    @Param('id') id: string,
+    @Body() dto: ReceiptBatchDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.batches.receive(id, dto, user);
   }
 }

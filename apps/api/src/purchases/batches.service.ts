@@ -10,6 +10,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { MailerService } from '../notifications/mailer.service';
 import { MergeBatchDto } from './dto/merge-batch.dto';
 import { ApproveBatchDto } from './dto/approve-batch.dto';
+import { ReceiptBatchDto } from './dto/receipt-batch.dto';
 import type { ActorContext } from './purchases.service';
 
 @Injectable()
@@ -146,5 +147,76 @@ export class BatchesService {
       }
     }
     return updated;
+  }
+
+  async receive(batchId: string, dto: ReceiptBatchDto, actor: ActorContext) {
+    const batch = await this.prisma.purchaseBatch.findUnique({
+      where: { id: batchId },
+      include: { items: true, receipt: true },
+    });
+    if (!batch) throw new NotFoundException('batch not found');
+    if (batch.receipt) throw new ConflictException('receipt already recorded');
+    if (batch.status !== 'APPROVED')
+      throw new ConflictException('batch not approved');
+
+    const actorUser = await this.prisma.user.findUnique({
+      where: { id: actor.sub },
+    });
+    if (actorUser?.labId !== batch.labId && !actor.roles.includes('SYS_ADMIN'))
+      throw new ForbiddenException('forbidden');
+
+    const receipt = await this.prisma.$transaction(async (tx) => {
+      const stock = await tx.reagentStock.create({
+        data: {
+          reagentId: batch.reagentId,
+          labId: batch.labId,
+          batchNo: dto.batchNo,
+          mfgDate: dto.mfgDate ? new Date(dto.mfgDate) : null,
+          expireDate: dto.expireDate ? new Date(dto.expireDate) : null,
+          initialQty: dto.actualQty,
+          currentQty: dto.actualQty,
+          unit: batch.unit,
+          location: dto.location,
+          supplier: dto.supplier,
+          purchasePrice: dto.purchasePrice,
+        },
+      });
+      const r = await tx.purchaseReceipt.create({
+        data: {
+          batchId,
+          stockId: stock.id,
+          receivedBy: actor.sub,
+          supplier: dto.supplier,
+          purchasePrice: dto.purchasePrice,
+        },
+      });
+      await tx.purchaseBatch.update({
+        where: { id: batchId },
+        data: { status: 'RECEIVED' },
+      });
+      return r;
+    });
+
+    const applicantIds = Array.from(new Set(batch.items.map((i) => i.applicantId)));
+    for (const aid of applicantIds) {
+      const u = await this.prisma.user.findUnique({ where: { id: aid } });
+      if (!u) continue;
+      const n = await this.notifications.create({
+        recipientId: aid,
+        labId: batch.labId,
+        type: 'PURCHASE_RECEIVED',
+        title: '采购试剂已入库',
+        body: `批次 ${batchId} 已入库，可申请领用`,
+        payload: { batchId, stockId: receipt.stockId, reagentId: batch.reagentId },
+      });
+      await this.mailer.send({
+        notificationId: n.id,
+        to: u.email,
+        subject: '采购试剂已入库',
+        body: n.body,
+      });
+    }
+
+    return receipt;
   }
 }
