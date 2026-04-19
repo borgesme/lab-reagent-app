@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma, RequestStatus } from '@prisma/client';
+import { isControlled } from '@app/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateRequestDto } from './dto/create-request.dto';
 import { QueryRequestDto } from './dto/query-request.dto';
@@ -71,6 +72,7 @@ export class RequestsService {
 
     const stock = await this.prisma.reagentStock.findUnique({
       where: { id: dto.stockId },
+      include: { reagent: true },
     });
     if (!stock || stock.deletedAt) throw new BadRequestException('stock not found');
     if (stock.reagentId !== dto.reagentId) {
@@ -81,6 +83,24 @@ export class RequestsService {
     }
     if (new Prisma.Decimal(dto.quantity).gt(stock.currentQty)) {
       throw new BadRequestException('quantity exceeds current stock');
+    }
+
+    if (isControlled(stock.reagent)) {
+      if (!dto.purpose || dto.purpose.length < 50) {
+        throw new BadRequestException(
+          'purpose must be >= 50 chars for controlled reagents',
+        );
+      }
+      if (!dto.projectRef) {
+        throw new BadRequestException(
+          'projectRef is required for controlled reagents',
+        );
+      }
+      if (!dto.useLocation) {
+        throw new BadRequestException(
+          'useLocation is required for controlled reagents',
+        );
+      }
     }
 
     return this.prisma.request.create({

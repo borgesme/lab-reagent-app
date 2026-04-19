@@ -61,6 +61,34 @@ describe('Requests', () => {
       },
     });
     stockId = stock.id;
+
+    await prisma.reagent.upsert({
+      where: { id: 'reagent-ctrl-test' },
+      update: {},
+      create: {
+        id: 'reagent-ctrl-test',
+        name: 'TestReagent-Controlled',
+        category: '管控',
+        hazardLevel: 'CONTROLLED',
+        controlType: 'TOXIC',
+      },
+    });
+    await prisma.reagentStock.upsert({
+      where: { id: 'stock-ctrl-test' },
+      update: {
+        currentQty: '500',
+        initialQty: '500',
+      },
+      create: {
+        id: 'stock-ctrl-test',
+        reagentId: 'reagent-ctrl-test',
+        labId: 'lab-default',
+        batchNo: 'CtrlBatch-01',
+        initialQty: '500',
+        currentQty: '500',
+        unit: 'g',
+      },
+    });
   });
 
   afterAll(async () => {
@@ -158,6 +186,86 @@ describe('Requests', () => {
       .post(`/requests/${id}/cancel`)
       .set('Authorization', `Bearer ${otherLogin.body.accessToken}`);
     expect(r.status).toBe(403);
+  });
+
+  describe('controlled create validation', () => {
+    let controlledReagentId: string;
+    let controlledStockId: string;
+
+    beforeAll(async () => {
+      const r = await prisma.reagent.findUniqueOrThrow({ where: { id: 'reagent-ctrl-test' } });
+      const s = await prisma.reagentStock.findFirstOrThrow({
+        where: { reagentId: r.id, batchNo: 'CtrlBatch-01' },
+      });
+      controlledReagentId = r.id;
+      controlledStockId = s.id;
+    });
+
+    it('rejects controlled request with short purpose', async () => {
+      const r = await request(app.getHttpServer())
+        .post('/requests')
+        .set('Authorization', `Bearer ${plainToken}`)
+        .send({
+          reagentId: controlledReagentId,
+          stockId: controlledStockId,
+          quantity: '5',
+          unit: 'g',
+          purpose: '短用途',
+          projectRef: 'P1',
+          useLocation: 'L1',
+        });
+      expect(r.status).toBe(400);
+      expect(r.body.message).toMatch(/purpose/i);
+    });
+
+    it('rejects controlled request missing projectRef', async () => {
+      const r = await request(app.getHttpServer())
+        .post('/requests')
+        .set('Authorization', `Bearer ${plainToken}`)
+        .send({
+          reagentId: controlledReagentId,
+          stockId: controlledStockId,
+          quantity: '5',
+          unit: 'g',
+          purpose: '这是一段足够长的管控试剂用途说明必须超过五十字的详细描述内容一二三四五六七八九十ABCDEF测试用例合规',
+          useLocation: 'L1',
+        });
+      expect(r.status).toBe(400);
+      expect(r.body.message).toMatch(/projectRef/);
+    });
+
+    it('rejects controlled request missing useLocation', async () => {
+      const r = await request(app.getHttpServer())
+        .post('/requests')
+        .set('Authorization', `Bearer ${plainToken}`)
+        .send({
+          reagentId: controlledReagentId,
+          stockId: controlledStockId,
+          quantity: '5',
+          unit: 'g',
+          purpose: '这是一段足够长的管控试剂用途说明必须超过五十字的详细描述内容一二三四五六七八九十ABCDEF测试用例合规',
+          projectRef: 'P1',
+        });
+      expect(r.status).toBe(400);
+      expect(r.body.message).toMatch(/useLocation/);
+    });
+
+    it('accepts controlled request meeting all rules', async () => {
+      const r = await request(app.getHttpServer())
+        .post('/requests')
+        .set('Authorization', `Bearer ${plainToken}`)
+        .send({
+          reagentId: controlledReagentId,
+          stockId: controlledStockId,
+          quantity: '3',
+          unit: 'g',
+          purpose: '这是一段足够长的管控试剂用途说明必须超过五十字的详细描述内容一二三四五六七八九十ABCDEF测试用例合规',
+          projectRef: 'P1',
+          useLocation: 'L1',
+        });
+      expect(r.status).toBe(201);
+      expect(r.body.status).toBe('PENDING');
+    });
   });
 
   describe('approvals', () => {
