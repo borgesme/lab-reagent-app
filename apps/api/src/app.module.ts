@@ -12,6 +12,7 @@ import { ReagentsModule } from './reagents/reagents.module';
 import { StocksModule } from './stocks/stocks.module';
 import { RequestsModule } from './requests/requests.module';
 import { LedgerModule } from './ledger/ledger.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { JwtStrategy } from './common/strategies/jwt.strategy';
 import { JwtAuthGuard } from './common/guards/jwt.guard';
 import { RolesGuard } from './common/guards/roles.guard';
@@ -30,6 +31,7 @@ import { AuditInterceptor } from './common/interceptors/audit.interceptor';
     StocksModule,
     RequestsModule,
     LedgerModule,
+    NotificationsModule,
   ],
   controllers: [HealthController],
   providers: [
