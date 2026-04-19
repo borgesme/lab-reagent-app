@@ -121,3 +121,77 @@ export interface ControlledLedgerSnapshotSummary {
   rowCount: number;
   createdAt: string;
 }
+
+export type PurchaseRequestStatus = 'PENDING' | 'MERGED' | 'CANCELLED';
+export type PurchaseBatchStatus =
+  | 'PENDING'
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'RECEIVED'
+  | 'CANCELLED';
+
+export type NotificationType =
+  | 'ALERT_EXPIRING'
+  | 'ALERT_LOW_STOCK'
+  | 'ALERT_RECONCILE'
+  | 'PURCHASE_APPROVED'
+  | 'PURCHASE_REJECTED'
+  | 'PURCHASE_RECEIVED';
+
+export interface PurchaseRequestSummary {
+  id: string;
+  applicantId: string;
+  labId: string;
+  reagentId: string;
+  quantity: string;
+  unit: string;
+  reason: string;
+  status: PurchaseRequestStatus;
+  batchId?: string | null;
+  createdAt: string;
+}
+
+export interface PurchaseBatchSummary {
+  id: string;
+  labId: string;
+  reagentId: string;
+  totalQty: string;
+  unit: string;
+  status: PurchaseBatchStatus;
+  rejectedReason?: string | null;
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface PurchaseReceiptSummary {
+  id: string;
+  batchId: string;
+  stockId: string;
+  receivedBy: string;
+  receivedAt: string;
+  supplier?: string | null;
+  purchasePrice?: string | null;
+}
+
+export interface LabReagentConfigSummary {
+  id: string;
+  labId: string;
+  reagentId: string;
+  safetyStock: string;
+  expireWarningDays: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface NotificationSummary {
+  id: string;
+  recipientId: string;
+  labId?: string | null;
+  type: NotificationType;
+  title: string;
+  body: string;
+  payload?: Record<string, unknown> | null;
+  readAt?: string | null;
+  emailedAt?: string | null;
+  createdAt: string;
+}
