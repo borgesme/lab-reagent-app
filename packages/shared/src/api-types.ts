@@ -96,3 +96,28 @@ export interface IssueSummary {
   actualQty: string;
   createdAt: string;
 }
+
+export interface ControlledLedgerRow {
+  date: string;
+  reagentName: string;
+  batchNo: string;
+  hazardLevel: string;
+  controlType: string | null;
+  applicant: string;
+  projectRef: string;
+  purpose: string;
+  actualQty: string;
+  unit: string;
+  issuer: string;
+  witness: string;
+  signed: 'Y' | 'N';
+  labId: string;
+}
+
+export interface ControlledLedgerSnapshotSummary {
+  id: string;
+  labId: string;
+  yearMonth: string;
+  rowCount: number;
+  createdAt: string;
+}
