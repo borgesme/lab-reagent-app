@@ -28,6 +28,22 @@ describe('Purchases', () => {
     await prisma.purchaseRequest.deleteMany({});
     await prisma.purchaseBatch.deleteMany({});
 
+    const p5Emails = [
+      'lh-p5@lab.local',
+      'ra-p5@lab.local',
+      'plain-p5@lab.local',
+      'nolab-p5@lab.local',
+    ];
+    const existingP5 = await prisma.user.findMany({
+      where: { email: { in: p5Emails } },
+      select: { id: true },
+    });
+    if (existingP5.length) {
+      await prisma.userRole.deleteMany({
+        where: { userId: { in: existingP5.map((u) => u.id) } },
+      });
+    }
+
     const aLogin = await request(app.getHttpServer())
       .post('/auth/login')
       .send({ email: 'admin@lab.local', password: 'admin123' });
@@ -186,6 +202,84 @@ describe('Purchases', () => {
         .post(`/purchases/${id}/cancel`)
         .set('Authorization', `Bearer ${plainToken}`);
       expect(res.status).toBe(409);
+    });
+  });
+
+  describe('POST /purchases/batches (merge)', () => {
+    async function createPR(qty: string) {
+      const res = await request(app.getHttpServer())
+        .post('/purchases')
+        .set('Authorization', `Bearer ${plainToken}`)
+        .send({ reagentId, quantity: qty, unit: 'mL', reason: 'merge' });
+      return res.body.id as string;
+    }
+
+    it('rejects empty requestIds', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/purchases/batches')
+        .set('Authorization', `Bearer ${reagentAdminToken}`)
+        .send({ requestIds: [] });
+      expect(res.status).toBe(400);
+    });
+
+    it('forbidden for LAB_HEAD', async () => {
+      const id = await createPR('1');
+      const res = await request(app.getHttpServer())
+        .post('/purchases/batches')
+        .set('Authorization', `Bearer ${labHeadToken}`)
+        .send({ requestIds: [id] });
+      expect(res.status).toBe(403);
+    });
+
+    it('409 when any request not PENDING', async () => {
+      const id = await createPR('1');
+      await prisma.purchaseRequest.update({
+        where: { id },
+        data: { status: 'CANCELLED' },
+      });
+      const res = await request(app.getHttpServer())
+        .post('/purchases/batches')
+        .set('Authorization', `Bearer ${reagentAdminToken}`)
+        .send({ requestIds: [id] });
+      expect(res.status).toBe(409);
+    });
+
+    it('400 when reagent differs', async () => {
+      const r2 = await prisma.reagent.upsert({
+        where: { id: 'reagent-p5-b' },
+        update: {},
+        create: { id: 'reagent-p5-b', name: 'P5B', category: '普通' },
+      });
+      const a = await createPR('1');
+      const bRes = await request(app.getHttpServer())
+        .post('/purchases')
+        .set('Authorization', `Bearer ${plainToken}`)
+        .send({ reagentId: r2.id, quantity: '1', unit: 'mL', reason: 't' });
+      const b = bRes.body.id;
+      const res = await request(app.getHttpServer())
+        .post('/purchases/batches')
+        .set('Authorization', `Bearer ${reagentAdminToken}`)
+        .send({ requestIds: [a, b] });
+      expect(res.status).toBe(400);
+    });
+
+    it('merges two PENDING requests into a batch', async () => {
+      const a = await createPR('100');
+      const b = await createPR('200');
+      const res = await request(app.getHttpServer())
+        .post('/purchases/batches')
+        .set('Authorization', `Bearer ${reagentAdminToken}`)
+        .send({ requestIds: [a, b] });
+      expect(res.status).toBe(201);
+      expect(res.body.status).toBe('PENDING');
+      expect(Number(res.body.totalQty)).toBe(300);
+      const [dbA, dbB] = await Promise.all([
+        prisma.purchaseRequest.findUnique({ where: { id: a } }),
+        prisma.purchaseRequest.findUnique({ where: { id: b } }),
+      ]);
+      expect(dbA?.status).toBe('MERGED');
+      expect(dbA?.batchId).toBe(res.body.id);
+      expect(dbB?.batchId).toBe(res.body.id);
     });
   });
 });

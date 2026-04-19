@@ -8,14 +8,19 @@ import {
   Query,
 } from '@nestjs/common';
 import { PurchasesService } from './purchases.service';
+import { BatchesService } from './batches.service';
 import { CreatePurchaseDto } from './dto/create-purchase.dto';
+import { MergeBatchDto } from './dto/merge-batch.dto';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Audit } from '../common/decorators/audit.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
 
 @Controller('purchases')
 export class PurchasesController {
-  constructor(private readonly svc: PurchasesService) {}
+  constructor(
+    private readonly svc: PurchasesService,
+    private readonly batches: BatchesService,
+  ) {}
 
   @Post()
   @Audit({ action: 'PURCHASE_CREATE', entityType: 'PurchaseRequest' })
@@ -39,5 +44,12 @@ export class PurchasesController {
   @Audit({ action: 'PURCHASE_CANCEL', entityType: 'PurchaseRequest' })
   cancel(@Param('id') id: string, @CurrentUser() user: any) {
     return this.svc.cancel(id, user);
+  }
+
+  @Post('batches')
+  @Roles('REAGENT_ADMIN', 'SYS_ADMIN')
+  @Audit({ action: 'PURCHASE_BATCH_CREATE', entityType: 'PurchaseBatch' })
+  merge(@Body() dto: MergeBatchDto, @CurrentUser() user: any) {
+    return this.batches.merge(dto, user);
   }
 }
