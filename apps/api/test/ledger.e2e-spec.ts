@@ -77,4 +77,41 @@ describe('Ledger', () => {
     expect(r.status).toBe(200);
     expect(r.body).toEqual([]);
   });
+
+  describe('snapshots', () => {
+    it('service.generateMonthly upserts snapshot', async () => {
+      const svc = app.get<any>(
+        require('../src/ledger/ledger.service').LedgerService,
+      );
+      const snap = await svc.generateMonthly('2100-03', 'lab-default');
+      expect(snap.labId).toBe('lab-default');
+      expect(snap.yearMonth).toBe('2100-03');
+      expect(typeof snap.csvContent).toBe('string');
+      expect(snap.csvContent.charCodeAt(0)).toBe(0xfeff);
+
+      const again = await svc.generateMonthly('2100-03', 'lab-default');
+      expect(again.id).toBe(snap.id);
+    });
+
+    it('GET /controlled-ledger/snapshots lists by desc', async () => {
+      const r = await request(app.getHttpServer())
+        .get('/controlled-ledger/snapshots')
+        .set('Authorization', `Bearer ${adminToken}`);
+      expect(r.status).toBe(200);
+      expect(Array.isArray(r.body)).toBe(true);
+    });
+
+    it('GET /controlled-ledger/snapshots/:id returns CSV', async () => {
+      const svc = app.get<any>(
+        require('../src/ledger/ledger.service').LedgerService,
+      );
+      const snap = await svc.generateMonthly('2100-04', 'lab-default');
+      const r = await request(app.getHttpServer())
+        .get(`/controlled-ledger/snapshots/${snap.id}`)
+        .set('Authorization', `Bearer ${adminToken}`);
+      expect(r.status).toBe(200);
+      expect(r.headers['content-type']).toMatch(/text\/csv/);
+      expect(r.text.charCodeAt(0)).toBe(0xfeff);
+    });
+  });
 });

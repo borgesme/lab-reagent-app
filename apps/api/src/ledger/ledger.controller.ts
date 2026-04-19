@@ -1,4 +1,4 @@
-import { Controller, Get, Query, Res } from '@nestjs/common';
+import { Controller, Get, Param, Query, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import { LedgerService } from './ledger.service';
 import { QueryLedgerDto } from './dto/query-ledger.dto';
@@ -26,5 +26,32 @@ export class LedgerController {
       return this.ledger.toCsv(rows);
     }
     return rows;
+  }
+
+  @Get('snapshots')
+  async listSnapshots(
+    @Query('labId') labId: string | undefined,
+    @CurrentUser() user: any,
+  ) {
+    return this.ledger.listSnapshots(labId, user);
+  }
+
+  @Get('snapshots/:id')
+  async getSnapshot(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const snap = await this.ledger.getSnapshot(id, user);
+    if (!snap) {
+      res.status(404);
+      return null;
+    }
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${snap.yearMonth}.csv"`,
+    );
+    return snap.csvContent;
   }
 }
