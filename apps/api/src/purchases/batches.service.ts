@@ -6,12 +6,19 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { MailerService } from '../notifications/mailer.service';
 import { MergeBatchDto } from './dto/merge-batch.dto';
+import { ApproveBatchDto } from './dto/approve-batch.dto';
 import type { ActorContext } from './purchases.service';
 
 @Injectable()
 export class BatchesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notifications: NotificationsService,
+    private mailer: MailerService,
+  ) {}
 
   async merge(dto: MergeBatchDto, actor: ActorContext) {
     const items = await this.prisma.purchaseRequest.findMany({
@@ -51,5 +58,93 @@ export class BatchesService {
       });
       return batch;
     });
+  }
+
+  async approve(batchId: string, dto: ApproveBatchDto, actor: ActorContext) {
+    const batch = await this.prisma.purchaseBatch.findUnique({
+      where: { id: batchId },
+      include: { items: true },
+    });
+    if (!batch) throw new NotFoundException('batch not found');
+    if (batch.status !== 'PENDING')
+      throw new ConflictException('batch not pending');
+
+    if (!actor.roles.includes('SYS_ADMIN')) {
+      const u = await this.prisma.user.findUnique({ where: { id: actor.sub } });
+      if (u?.labId !== batch.labId)
+        throw new ForbiddenException('forbidden');
+    }
+
+    const nextStatus = dto.action === 'APPROVE' ? 'APPROVED' : 'REJECTED';
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await tx.purchaseApproval.create({
+        data: {
+          batchId,
+          approverId: actor.sub,
+          action: dto.action,
+          comment: dto.comment,
+        },
+      });
+      const b = await tx.purchaseBatch.update({
+        where: { id: batchId },
+        data: {
+          status: nextStatus,
+          rejectedReason: dto.action === 'REJECT' ? dto.comment : null,
+        },
+      });
+      if (dto.action === 'REJECT') {
+        await tx.purchaseRequest.updateMany({
+          where: { batchId },
+          data: { status: 'PENDING', batchId: null },
+        });
+      }
+      return b;
+    });
+
+    if (dto.action === 'APPROVE') {
+      const recipients = await this.prisma.user.findMany({
+        where: {
+          labId: batch.labId,
+          roles: { some: { role: { code: 'REAGENT_ADMIN' } } },
+        },
+      });
+      for (const r of recipients) {
+        const n = await this.notifications.create({
+          recipientId: r.id,
+          labId: batch.labId,
+          type: 'PURCHASE_APPROVED',
+          title: '采购批次已审批',
+          body: `批次 ${batchId} 已通过，可以下单入库`,
+          payload: { batchId, reagentId: batch.reagentId },
+        });
+        await this.mailer.send({
+          notificationId: n.id,
+          to: r.email,
+          subject: '采购批次已审批',
+          body: n.body,
+        });
+      }
+    } else {
+      const applicantIds = Array.from(new Set(batch.items.map((i) => i.applicantId)));
+      for (const aid of applicantIds) {
+        const u = await this.prisma.user.findUnique({ where: { id: aid } });
+        if (!u) continue;
+        const n = await this.notifications.create({
+          recipientId: aid,
+          labId: batch.labId,
+          type: 'PURCHASE_REJECTED',
+          title: '采购批次被驳回',
+          body: `原因：${dto.comment ?? '无'}`,
+          payload: { batchId, reagentId: batch.reagentId },
+        });
+        await this.mailer.send({
+          notificationId: n.id,
+          to: u.email,
+          subject: '采购批次被驳回',
+          body: n.body,
+        });
+      }
+    }
+    return updated;
   }
 }

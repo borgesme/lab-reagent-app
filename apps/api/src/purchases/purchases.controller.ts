@@ -11,6 +11,7 @@ import { PurchasesService } from './purchases.service';
 import { BatchesService } from './batches.service';
 import { CreatePurchaseDto } from './dto/create-purchase.dto';
 import { MergeBatchDto } from './dto/merge-batch.dto';
+import { ApproveBatchDto } from './dto/approve-batch.dto';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Audit } from '../common/decorators/audit.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -51,5 +52,17 @@ export class PurchasesController {
   @Audit({ action: 'PURCHASE_BATCH_CREATE', entityType: 'PurchaseBatch' })
   merge(@Body() dto: MergeBatchDto, @CurrentUser() user: any) {
     return this.batches.merge(dto, user);
+  }
+
+  @Post('batches/:id/approve')
+  @HttpCode(200)
+  @Roles('LAB_HEAD', 'SYS_ADMIN')
+  @Audit({ action: 'PURCHASE_BATCH_APPROVE', entityType: 'PurchaseBatch' })
+  approve(
+    @Param('id') id: string,
+    @Body() dto: ApproveBatchDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.batches.approve(id, dto, user);
   }
 }

@@ -282,4 +282,92 @@ describe('Purchases', () => {
       expect(dbB?.batchId).toBe(res.body.id);
     });
   });
+
+  describe('POST /purchases/batches/:id/approve', () => {
+    async function newBatch() {
+      const r = await request(app.getHttpServer())
+        .post('/purchases')
+        .set('Authorization', `Bearer ${plainToken}`)
+        .send({ reagentId, quantity: '10', unit: 'mL', reason: 'x' });
+      const m = await request(app.getHttpServer())
+        .post('/purchases/batches')
+        .set('Authorization', `Bearer ${reagentAdminToken}`)
+        .send({ requestIds: [r.body.id] });
+      return { batchId: m.body.id, requestId: r.body.id };
+    }
+
+    it('APPROVE flips batch status and notifies REAGENT_ADMIN', async () => {
+      await prisma.notification.deleteMany({ where: { recipientId: reagentAdminId } });
+      const { batchId } = await newBatch();
+      const res = await request(app.getHttpServer())
+        .post(`/purchases/batches/${batchId}/approve`)
+        .set('Authorization', `Bearer ${labHeadToken}`)
+        .send({ action: 'APPROVE', comment: 'ok' });
+      expect(res.status).toBe(200);
+      const db = await prisma.purchaseBatch.findUnique({ where: { id: batchId } });
+      expect(db?.status).toBe('APPROVED');
+      const notif = await prisma.notification.findFirst({
+        where: { recipientId: reagentAdminId, type: 'PURCHASE_APPROVED' },
+      });
+      expect(notif).not.toBeNull();
+    });
+
+    it('REJECT rolls items back to PENDING and notifies applicants', async () => {
+      await prisma.notification.deleteMany({ where: { recipientId: plainId } });
+      const { batchId, requestId } = await newBatch();
+      const res = await request(app.getHttpServer())
+        .post(`/purchases/batches/${batchId}/approve`)
+        .set('Authorization', `Bearer ${labHeadToken}`)
+        .send({ action: 'REJECT', comment: '预算不足' });
+      expect(res.status).toBe(200);
+      const b = await prisma.purchaseBatch.findUnique({ where: { id: batchId } });
+      expect(b?.status).toBe('REJECTED');
+      expect(b?.rejectedReason).toBe('预算不足');
+      const pr = await prisma.purchaseRequest.findUnique({ where: { id: requestId } });
+      expect(pr?.status).toBe('PENDING');
+      expect(pr?.batchId).toBeNull();
+      const notif = await prisma.notification.findFirst({
+        where: { recipientId: plainId, type: 'PURCHASE_REJECTED' },
+      });
+      expect(notif).not.toBeNull();
+    });
+
+    it('409 when batch not PENDING', async () => {
+      const { batchId } = await newBatch();
+      await prisma.purchaseBatch.update({
+        where: { id: batchId },
+        data: { status: 'APPROVED' },
+      });
+      const res = await request(app.getHttpServer())
+        .post(`/purchases/batches/${batchId}/approve`)
+        .set('Authorization', `Bearer ${labHeadToken}`)
+        .send({ action: 'APPROVE' });
+      expect(res.status).toBe(409);
+    });
+
+    it('forbidden for non-lab LAB_HEAD', async () => {
+      const { batchId } = await newBatch();
+      await prisma.lab.upsert({
+        where: { id: 'other-lab' },
+        update: {},
+        create: { id: 'other-lab', name: '其他实验室' },
+      });
+      await prisma.user.update({
+        where: { id: labHeadId },
+        data: { labId: 'other-lab' },
+      });
+      const newLogin = await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({ email: 'lh-p5@lab.local', password: 'pass1234' });
+      const res = await request(app.getHttpServer())
+        .post(`/purchases/batches/${batchId}/approve`)
+        .set('Authorization', `Bearer ${newLogin.body.accessToken}`)
+        .send({ action: 'APPROVE' });
+      expect(res.status).toBe(403);
+      await prisma.user.update({
+        where: { id: labHeadId },
+        data: { labId: 'lab-default' },
+      });
+    });
+  });
 });
