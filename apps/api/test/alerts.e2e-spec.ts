@@ -111,4 +111,156 @@ describe('Alerts', () => {
       expect(res.body.length).toBeGreaterThanOrEqual(1);
     });
   });
+
+  describe('AlertsService.runDaily', () => {
+    it('creates notifications for expiring + low stock + reconcile', async () => {
+      const alerts = app.get((await import('../src/alerts/alerts.service')).AlertsService);
+
+      await prisma.labReagentConfig.upsert({
+        where: {
+          labId_reagentId: { labId: 'lab-default', reagentId },
+        },
+        update: { safetyStock: '100' },
+        create: { labId: 'lab-default', reagentId, safetyStock: '100' },
+      });
+      const nearExpire = new Date();
+      nearExpire.setDate(nearExpire.getDate() + 10);
+      await prisma.reagentStock.upsert({
+        where: { id: 'stock-alert-low' },
+        update: {
+          currentQty: '50',
+          initialQty: '500',
+          expireDate: nearExpire,
+        },
+        create: {
+          id: 'stock-alert-low',
+          reagentId,
+          labId: 'lab-default',
+          initialQty: '500',
+          currentQty: '50',
+          unit: 'mL',
+          expireDate: nearExpire,
+        },
+      });
+
+      await prisma.notification.deleteMany({ where: { recipientId: labHeadId } });
+
+      await alerts.runDaily();
+
+      const notifs = await prisma.notification.findMany({
+        where: { recipientId: labHeadId },
+      });
+      const types = new Set(notifs.map((n) => n.type));
+      expect(types.has('ALERT_LOW_STOCK')).toBe(true);
+      expect(types.has('ALERT_EXPIRING')).toBe(true);
+    });
+
+    it('second runDaily same day is idempotent', async () => {
+      const alerts = app.get((await import('../src/alerts/alerts.service')).AlertsService);
+      const before = await prisma.notification.count({
+        where: { recipientId: labHeadId, readAt: null },
+      });
+      await alerts.runDaily();
+      const after = await prisma.notification.count({
+        where: { recipientId: labHeadId, readAt: null },
+      });
+      expect(after).toBe(before);
+    });
+
+    it('skips lowStock when config absent but still emits expiring', async () => {
+      const alerts = app.get((await import('../src/alerts/alerts.service')).AlertsService);
+
+      const r2 = await prisma.reagent.upsert({
+        where: { id: 'reagent-no-config' },
+        update: {},
+        create: { id: 'reagent-no-config', name: 'NoConfig', category: '普通' },
+      });
+      const nearExpire = new Date();
+      nearExpire.setDate(nearExpire.getDate() + 5);
+      await prisma.reagentStock.upsert({
+        where: { id: 'stock-noconfig' },
+        update: { expireDate: nearExpire },
+        create: {
+          id: 'stock-noconfig',
+          reagentId: r2.id,
+          labId: 'lab-default',
+          initialQty: '100',
+          currentQty: '100',
+          unit: 'mL',
+          expireDate: nearExpire,
+        },
+      });
+      await prisma.notification.deleteMany({ where: { recipientId: labHeadId } });
+      await alerts.runDaily();
+      const low = await prisma.notification.findFirst({
+        where: {
+          recipientId: labHeadId,
+          type: 'ALERT_LOW_STOCK',
+          payload: { path: ['reagentId'], equals: r2.id },
+        },
+      });
+      expect(low).toBeNull();
+      const expiring = await prisma.notification.findFirst({
+        where: {
+          recipientId: labHeadId,
+          type: 'ALERT_EXPIRING',
+          payload: { path: ['reagentId'], equals: r2.id },
+        },
+      });
+      expect(expiring).not.toBeNull();
+    });
+
+    it('reports controlled reconcile anomaly when qty mismatch', async () => {
+      const alerts = app.get((await import('../src/alerts/alerts.service')).AlertsService);
+
+      const ctrl = await prisma.reagent.upsert({
+        where: { id: 'reagent-ctrl-alert' },
+        update: {},
+        create: {
+          id: 'reagent-ctrl-alert',
+          name: 'CtrlAlert',
+          category: '管控',
+          hazardLevel: 'CONTROLLED',
+          controlType: 'TOXIC',
+        },
+      });
+      await prisma.reagentStock.upsert({
+        where: { id: 'stock-ctrl-ok' },
+        update: { initialQty: '500', currentQty: '500' },
+        create: {
+          id: 'stock-ctrl-ok',
+          reagentId: ctrl.id,
+          labId: 'lab-default',
+          initialQty: '500',
+          currentQty: '500',
+          unit: 'mL',
+        },
+      });
+      await prisma.reagentStock.upsert({
+        where: { id: 'stock-ctrl-bad' },
+        update: { initialQty: '500', currentQty: '100' },
+        create: {
+          id: 'stock-ctrl-bad',
+          reagentId: ctrl.id,
+          labId: 'lab-default',
+          initialQty: '500',
+          currentQty: '100',
+          unit: 'mL',
+        },
+      });
+
+      await prisma.notification.deleteMany({
+        where: { recipientId: labHeadId, type: 'ALERT_RECONCILE' },
+      });
+      await alerts.runDaily();
+      const rec = await prisma.notification.findFirst({
+        where: {
+          recipientId: labHeadId,
+          type: 'ALERT_RECONCILE',
+          payload: { path: ['reagentId'], equals: ctrl.id },
+        },
+      });
+      expect(rec).not.toBeNull();
+    });
+  });
 });
