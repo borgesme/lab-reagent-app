@@ -1,4 +1,4 @@
-const BASE =
+export const apiBaseUrl =
   process.env.NEXT_PUBLIC_API_BASE ?? 'http://localhost:3001/api/v1';
 
 export async function apiFetch<T = any>(
@@ -9,7 +9,7 @@ export async function apiFetch<T = any>(
     'Content-Type': 'application/json',
   };
   if (opts.token) headers['Authorization'] = `Bearer ${opts.token}`;
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await fetch(`${apiBaseUrl}${path}`, {
     method: opts.method ?? 'GET',
     headers,
     body: opts.body ? JSON.stringify(opts.body) : undefined,

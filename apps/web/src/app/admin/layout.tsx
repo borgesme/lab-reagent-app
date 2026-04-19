@@ -31,6 +31,9 @@ export default function AdminLayout({
           <Link href="/admin/issues" className="block">
             发放
           </Link>
+          <Link href="/admin/ledger" className="block">
+            台账
+          </Link>
         </aside>
         <main className="flex-1 p-6">{children}</main>
       </div>

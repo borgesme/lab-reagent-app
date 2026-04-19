@@ -1,7 +1,14 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import SignatureCanvas from 'react-signature-canvas';
 import { apiFetch } from '@/lib/api-client';
 import { useAuth } from '@/lib/auth-store';
+
+interface UserLite {
+  id: string;
+  name: string;
+  email: string;
+}
 
 interface RequestItem {
   id: string;
@@ -10,27 +17,33 @@ interface RequestItem {
   unit: string;
   purpose: string;
   createdAt: string;
-  reagent: { name: string };
+  reagent: { name: string; hazardLevel?: string; controlType?: string | null };
   stock: { batchNo?: string | null };
-  applicant: { name: string; email: string };
+  applicant: UserLite;
+  labId?: string;
 }
 
 export default function IssuesPage() {
   const token = useAuth((s) => s.tokens?.accessToken);
   const [pending, setPending] = useState<RequestItem[]>([]);
   const [issued, setIssued] = useState<RequestItem[]>([]);
+  const [witnesses, setWitnesses] = useState<UserLite[]>([]);
   const [err, setErr] = useState<string | null>(null);
   const [qtyById, setQtyById] = useState<Record<string, string>>({});
+  const [witnessById, setWitnessById] = useState<Record<string, string>>({});
+  const sigRefs = useRef<Record<string, SignatureCanvas | null>>({});
 
   async function refresh() {
     if (!token) return;
     try {
-      const [ap, iss] = await Promise.all([
+      const [ap, iss, users] = await Promise.all([
         apiFetch<RequestItem[]>('/requests?status=APPROVED', { token }),
         apiFetch<RequestItem[]>('/requests?status=ISSUED', { token }),
+        apiFetch<UserLite[]>('/users', { token }).catch(() => []),
       ]);
       setPending(ap);
       setIssued(iss);
+      setWitnesses(users);
       setErr(null);
     } catch (e: any) {
       setErr(e.message);
@@ -42,15 +55,32 @@ export default function IssuesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
+  const isCtrl = (r: RequestItem) =>
+    r.reagent.hazardLevel === 'CONTROLLED' || !!r.reagent.controlType;
+
   async function issue(r: RequestItem) {
     const actualQty = qtyById[r.id] ?? r.quantity;
     try {
+      const body: Record<string, unknown> = { actualQty };
+      if (isCtrl(r)) {
+        if (!witnessById[r.id]) {
+          throw new Error('请选择见证人');
+        }
+        body.witnessId = witnessById[r.id];
+        const sig = sigRefs.current[r.id];
+        if (!sig || sig.isEmpty()) {
+          throw new Error('请领用人签名后再发放');
+        }
+        body.signatureDataUrl = sig.toDataURL('image/png');
+      }
       await apiFetch(`/requests/${r.id}/issues`, {
         method: 'POST',
         token,
-        body: { actualQty },
+        body,
       });
+      sigRefs.current[r.id]?.clear();
       setQtyById((m) => ({ ...m, [r.id]: '' }));
+      setWitnessById((m) => ({ ...m, [r.id]: '' }));
       refresh();
     } catch (e: any) {
       setErr(e.message);
@@ -64,37 +94,86 @@ export default function IssuesPage() {
 
       <h3 className="font-semibold mt-4 mb-2">待发放</h3>
       {pending.length === 0 && <p className="text-gray-500">无</p>}
-      <ul className="space-y-2 mb-6">
-        {pending.map((r) => (
-          <li key={r.id} className="border p-3 rounded flex justify-between">
-            <div>
-              <div className="font-medium">
-                {r.reagent.name} · 批号 {r.stock.batchNo ?? '-'} · 申请
-                {r.quantity}
-                {r.unit}
+      <ul className="space-y-3 mb-6">
+        {pending.map((r) => {
+          const ctrl = isCtrl(r);
+          return (
+            <li key={r.id} className="border p-3 rounded">
+              <div className="flex justify-between">
+                <div>
+                  <div className="font-medium">
+                    {r.reagent.name} · 批号 {r.stock.batchNo ?? '-'} · 申请
+                    {r.quantity}
+                    {r.unit}
+                    {ctrl && (
+                      <span className="ml-2 text-red-600 text-sm">[管控]</span>
+                    )}
+                  </div>
+                  <div className="text-sm text-gray-700">
+                    {r.applicant.name} · {r.purpose}
+                  </div>
+                </div>
+                <input
+                  className="border p-1 w-24 text-sm"
+                  placeholder={`实际量 (${r.unit})`}
+                  value={qtyById[r.id] ?? ''}
+                  onChange={(e) =>
+                    setQtyById((m) => ({ ...m, [r.id]: e.target.value }))
+                  }
+                />
               </div>
-              <div className="text-sm text-gray-700">
-                {r.applicant.name} · {r.purpose}
-              </div>
-            </div>
-            <div className="flex gap-2 items-center">
-              <input
-                className="border p-1 w-24 text-sm"
-                placeholder={`实际量 (${r.unit})`}
-                value={qtyById[r.id] ?? ''}
-                onChange={(e) =>
-                  setQtyById((m) => ({ ...m, [r.id]: e.target.value }))
-                }
-              />
+              {ctrl && (
+                <div className="mt-2 space-y-2">
+                  <select
+                    className="border p-1 text-sm"
+                    value={witnessById[r.id] ?? ''}
+                    onChange={(e) =>
+                      setWitnessById((m) => ({
+                        ...m,
+                        [r.id]: e.target.value,
+                      }))
+                    }
+                  >
+                    <option value="">选择见证人</option>
+                    {witnesses.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name} ({u.email})
+                      </option>
+                    ))}
+                  </select>
+                  <div>
+                    <div className="text-sm text-gray-600 mb-1">
+                      领用人签名：
+                    </div>
+                    <SignatureCanvas
+                      ref={(el) => {
+                        sigRefs.current[r.id] = el;
+                      }}
+                      canvasProps={{
+                        width: 400,
+                        height: 120,
+                        className: 'border',
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className="text-xs text-gray-500 underline ml-2"
+                      onClick={() => sigRefs.current[r.id]?.clear()}
+                    >
+                      清空
+                    </button>
+                  </div>
+                </div>
+              )}
               <button
-                className="bg-blue-600 text-white px-3 py-1 text-sm"
+                className="bg-blue-600 text-white px-3 py-1 text-sm mt-2"
                 onClick={() => issue(r)}
               >
                 发放
               </button>
-            </div>
-          </li>
-        ))}
+            </li>
+          );
+        })}
       </ul>
 
       <h3 className="font-semibold mt-4 mb-2">已发放台账</h3>
