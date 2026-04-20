@@ -34,6 +34,12 @@ export default function AdminLayout({
           <Link href="/admin/ledger" className="block">
             台账
           </Link>
+          <Link href="/admin/purchases" className="block">
+            采购
+          </Link>
+          <Link href="/admin/alerts/config" className="block">
+            预警配置
+          </Link>
         </aside>
         <main className="flex-1 p-6">{children}</main>
       </div>
