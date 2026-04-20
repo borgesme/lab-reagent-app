@@ -1,5 +1,6 @@
 import './globals.css';
 import type { Metadata } from 'next';
+import { NotificationBell } from '@/components/NotificationBell';
 
 export const metadata: Metadata = { title: '实验室试剂管理' };
 
@@ -10,7 +11,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="zh-CN">
-      <body>{children}</body>
+      <body>
+        <NotificationBell />
+        {children}
+      </body>
     </html>
   );
 }
