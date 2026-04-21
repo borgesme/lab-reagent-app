@@ -4,6 +4,8 @@
   "scripts": {
     "dev:api": "pnpm --filter @app/api start:dev",
     "dev:web": "pnpm --filter @app/web dev",
+    "dev:mp": "pnpm --filter @app/miniapp dev:h5",
+    "build:mp": "pnpm --filter @app/miniapp build:weapp",
     "test": "pnpm -r test",
     "lint": "pnpm -r lint",
     "build": "pnpm -r build",
