@@ -1,0 +1,25 @@
+{
+  "miniprogramRoot": "dist/",
+  "projectname": "lab-reagent-miniapp",
+  "description": "Lab Reagent Miniapp",
+  "appid": "touristappid",
+  "setting": {
+    "urlCheck": false,
+    "es6": false,
+    "enhance": true,
+    "postcss": false,
+    "minified": false,
+    "newFeature": true,
+    "autoAudits": false,
+    "coverView": true,
+    "showShadowRootInWxmlPanel": true
+  },
+  "compileType": "miniprogram",
+  "libVersion": "2.19.4",
+  "packOptions": { "ignore": [] },
+  "debugOptions": { "hidedInDevtools": [] },
+  "scripts": {},
+  "staticServerOptions": { "baseURL": "", "servePath": "" },
+  "editorSetting": { "tabIndent": "insertSpaces", "tabSize": 2 },
+  "condition": {}
+}
