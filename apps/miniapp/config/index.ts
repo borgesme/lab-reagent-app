@@ -35,6 +35,12 @@ const config = {
       autoprefixer: { enable: true, config: {} },
       cssModules: { enable: false },
     },
+    webpackChain(chain: any) {
+      chain.output.set('environment', {
+        ...(chain.output.get('environment') || {}),
+        asyncFunction: true,
+      });
+    },
   },
 };
 
