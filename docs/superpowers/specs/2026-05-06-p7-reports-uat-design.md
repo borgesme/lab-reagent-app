@@ -82,7 +82,9 @@ _components/
                            (如 range=30d 时与前 30 天对比;range=custom 时不显示环比)
   ChartCard.tsx            recharts 容器,封装空态/加载态/错态
   ExportButton.tsx         下拉 CSV/Excel,触发 <a href={endpoint}?format=...>
-  useReportData.ts         SWR hook,key=['report', type, scope, range, startDate, endDate, ...specific]
+  useReportData.ts         自定义 hook (useState + useEffect + apiFetch),
+                           不引入 SWR(与 Web 现有数据获取模式对齐 YAGNI);
+                           内部 useEffect 依赖 [type, range, startDate, endDate, ...specific]
 ```
 
 布局沿用 `/admin/layout.tsx` 的 `<aside class="w-48 bg-gray-100"> + <main>` 结构,保持视觉一致。
