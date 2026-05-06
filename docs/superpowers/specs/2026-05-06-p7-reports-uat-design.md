@@ -34,14 +34,14 @@ P7 落地两件事:
 
 | 报表 | Prisma 模型 | 关键聚合 |
 | --- | --- | --- |
-| 领用趋势 | `IssueRecord` | group by 时间桶 + `reagentId`,sum(qty) |
+| 领用趋势 | `IssueRecord` | group by 时间桶 + `reagentId`,sum(`actualQty`) |
 | 库存周转 | `ReagentStock` + `IssueRecord` | 周转天数 = 平均库存 / 日均出库 |
-| 采购金额 | `PurchaseBatch` + `PurchaseReceipt` | sum(`unitPriceCents * qty`) by month/category/supplier |
+| 采购金额 | `PurchaseBatch` + `PurchaseReceipt` | sum(`PurchaseReceipt.purchasePrice`) by month/category/supplier;未到货批次单独统计 |
 | 管控试剂审计 | `ControlledLedgerSnapshot` + `AuditLog` (`entityType` 前缀 `Controlled`) | 时间倒序明细行 |
 
 约定:
 
-- 所有金额内部以 `cents` 流转,**仅在导出/JSON 序列化层转 2 位小数元**
+- 所有金额字段为 Prisma `Decimal(12,2)` 元(`PurchaseReceipt.purchasePrice` / `ReagentStock.purchasePrice`),**不是 cents**;service 中以 `Decimal` 流转,JSON 序列化时 `.toFixed(2)`,csv/xlsx 直接写字符串
 - 时间窗最大 365 天(超出 → `400 REPORT_RANGE_TOO_WIDE`),防止扫表
 - 单次返回行数硬封顶 10000(超出 → `400 REPORT_TOO_LARGE`)
 
@@ -134,7 +134,7 @@ miniapp-h5.spec.ts            登录 + report-summary 渲染断言
 | --- | --- | --- |
 | `GET /api/v1/reports/usage-trend` | `groupBy=day\|week\|month` (默认 day), `reagentId?` | `{ summary: { totalIssued, distinctReagents, avgDailyIssued }, series: [{ bucket, qty, reagentBreakdown? }] }` |
 | `GET /api/v1/reports/inventory-turnover` | `labId?` | `{ summary: { avgTurnoverDays, lowStockCount }, rows: [{ reagentId, name, currentQty, avgQty, dailyOut, turnoverDays, status: 'ok'\|'low'\|'stale' }] }` |
-| `GET /api/v1/reports/purchase-amount` | `groupBy=month\|category\|supplier` | `{ summary: { totalCents, batchCount }, series: [{ bucket, amountCents, batchCount }] }` |
+| `GET /api/v1/reports/purchase-amount` | `groupBy=month\|category\|supplier` | `{ summary: { totalAmount, batchCount, pendingBatchCount }, series: [{ bucket, amount, batchCount }] }` (`amount`/`totalAmount` 为字符串,2 位小数元) |
 | `GET /api/v1/reports/controlled-audit` | `reagentId?, actorId?` | `{ summary: { totalEvents, distinctActors }, rows: [{ ts, action, reagentName, actorName, qty, beforeQty, afterQty }] }` |
 
 `format=csv|xlsx` 时:
