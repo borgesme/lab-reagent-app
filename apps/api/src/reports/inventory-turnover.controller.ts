@@ -19,6 +19,9 @@ export class InventoryTurnoverController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const data = await this.svc.run(q, req.reportScope);
+    if (q.summary === '1') {
+      return { summary: data.summary, rows: [] };
+    }
     if (q.format === 'csv') {
       res.setHeader('Content-Type', 'text/csv; charset=utf-8');
       res.setHeader(
