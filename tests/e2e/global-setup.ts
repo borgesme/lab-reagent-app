@@ -3,18 +3,19 @@ import { chromium, type FullConfig } from '@playwright/test';
 import { ensureStorageState } from './fixtures/auth';
 
 // Runs once before any test:
-// 1. Ensure DB is migrated and seed data (admin/labhead/plain) exists, so
-//    storage state fixtures can actually log in.
-// 2. Pre-warm storage state for all 3 roles, so test.use({ storageState })
-//    in spec files can read the file synchronously at worker init time.
+// 1. migrate + seed the API DB so admin/labhead/plain users exist
+// 2. pre-warm storage state for those 3 roles, so per-spec
+//    test.use({ storageState }) can read .auth/<role>.json synchronously
 //
 // Skipping:
-//   E2E_SKIP_SEED=1   -> skip migrate + seed (use when DB is already ready)
-//   E2E_SKIP_AUTH=1   -> skip browser login (use to debug a specific spec)
+//   E2E_SKIP_SEED=1   skip migrate + seed (DB is already prepared)
+//   E2E_SKIP_AUTH=1   skip browser login (debugging a single spec)
 export default async function globalSetup(_config: FullConfig) {
   if (process.env.E2E_SKIP_SEED !== '1') {
     const opts: Parameters<typeof execSync>[1] = { stdio: 'inherit' };
-    execSync('pnpm --filter @app/api prisma migrate deploy', opts);
+    // pnpm --filter <pkg> exec runs the binary; pnpm --filter <pkg> <name>
+    // would look for an npm script named "prisma" which doesn't exist.
+    execSync('pnpm --filter @app/api exec prisma migrate deploy', opts);
     execSync('pnpm --filter @app/api prisma:seed', opts);
   }
 

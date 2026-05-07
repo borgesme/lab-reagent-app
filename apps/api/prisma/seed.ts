@@ -25,7 +25,7 @@ async function main() {
   const passwordHash = await bcrypt.hash('admin123', 10);
   const admin = await prisma.user.upsert({
     where: { email: 'admin@lab.local' },
-    update: {},
+    update: { passwordHash, name: '系统管理员', labId: lab.id },
     create: {
       email: 'admin@lab.local',
       name: '系统管理员',
@@ -55,13 +55,14 @@ async function main() {
   const labHeadRole = await prisma.role.findUniqueOrThrow({ where: { code: 'LAB_HEAD' } });
   const plainRole = await prisma.role.findUniqueOrThrow({ where: { code: 'PLAIN_USER' } });
 
+  const labHeadHash = await bcrypt.hash('lab12345', 10);
   const labHead = await prisma.user.upsert({
     where: { email: 'labhead@lab.local' },
-    update: {},
+    update: { passwordHash: labHeadHash, name: 'Lab Head', labId: lab.id },
     create: {
       email: 'labhead@lab.local',
       name: 'Lab Head',
-      passwordHash: await bcrypt.hash('lab12345', 10),
+      passwordHash: labHeadHash,
       labId: lab.id,
     },
   });
@@ -71,13 +72,14 @@ async function main() {
     create: { userId: labHead.id, roleId: labHeadRole.id },
   });
 
+  const plainHash = await bcrypt.hash('plain123', 10);
   const plainUser = await prisma.user.upsert({
     where: { email: 'plain@lab.local' },
-    update: {},
+    update: { passwordHash: plainHash, name: 'Plain User', labId: lab.id },
     create: {
       email: 'plain@lab.local',
       name: 'Plain User',
-      passwordHash: await bcrypt.hash('plain123', 10),
+      passwordHash: plainHash,
       labId: lab.id,
     },
   });

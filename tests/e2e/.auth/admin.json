@@ -1,0 +1,14 @@
+{
+  "cookies": [],
+  "origins": [
+    {
+      "origin": "http://localhost:3000",
+      "localStorage": [
+        {
+          "name": "auth-store-v1",
+          "value": "{\"state\":{\"tokens\":{\"accessToken\":\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbW8zeXp4OHQwMDA2ajI5YWswaGRuNmliIiwicm9sZXMiOlsiU1lTX0FETUlOIl0sImlhdCI6MTc3ODE2Njk5OCwiZXhwIjoxNzc4MTY3ODk4fQ.v35lUW8nQ7oKLEC3KPXPAgkHHmyf0cMStZ7INqNvITY\",\"refreshToken\":\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbW8zeXp4OHQwMDA2ajI5YWswaGRuNmliIiwicm9sZXMiOlsiU1lTX0FETUlOIl0sImlhdCI6MTc3ODE2Njk5OCwiZXhwIjoxNzc4NzcxNzk4fQ.eSxdictYXBMd8xYyD_rHCDN1k817aE_Ywng1jIpqk1k\"},\"user\":{\"id\":\"cmo3yzx8t0006j29ak0hdn6ib\",\"email\":\"admin@lab.local\",\"name\":\"系统管理员\",\"labId\":\"lab-default\",\"roles\":[\"SYS_ADMIN\"]}},\"version\":0}"
+        }
+      ]
+    }
+  ]
+}
