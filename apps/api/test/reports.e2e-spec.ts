@@ -222,4 +222,33 @@ describe('Reports (M1 stubs)', () => {
       expect(r.status).toBe(403);
     });
   });
+
+  describe('controlled-audit', () => {
+    it('SYS_ADMIN sees rows desc by ts', async () => {
+      const r = await request(app.getHttpServer())
+        .get('/reports/controlled-audit?range=365d')
+        .set('Authorization', `Bearer ${adminToken}`);
+      expect(r.status).toBe(200);
+      expect(r.body.summary).toMatchObject({
+        totalEvents: expect.any(Number),
+        distinctActors: expect.any(Number),
+      });
+      expect(Array.isArray(r.body.rows)).toBe(true);
+    });
+
+    it('SAFETY_OFFICER allowed (scope=all)', async () => {
+      if (!process.env.SEED_SAFETY_USER) return;
+      const r = await request(app.getHttpServer())
+        .get('/reports/controlled-audit?range=30d')
+        .set('Authorization', `Bearer ${adminToken}`);
+      expect(r.status).toBe(200);
+    });
+
+    it('PLAIN_USER forbidden', async () => {
+      const r = await request(app.getHttpServer())
+        .get('/reports/controlled-audit')
+        .set('Authorization', `Bearer ${plainToken}`);
+      expect(r.status).toBe(403);
+    });
+  });
 });
