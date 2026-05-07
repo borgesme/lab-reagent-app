@@ -70,4 +70,87 @@ describe('Reports (M1 stubs)', () => {
       }
     });
   });
+
+  describe('usage-trend', () => {
+    let prisma: import('../src/prisma/prisma.service').PrismaService;
+
+    beforeAll(async () => {
+      prisma = (app as any).get(
+        require('../src/prisma/prisma.service').PrismaService,
+      );
+
+      const adminUser = await prisma.user.findUnique({
+        where: { email: 'admin@lab.local' },
+      });
+      const reagent = await prisma.reagent.upsert({
+        where: { id: 'reagent-p7-usage' },
+        update: {},
+        create: { id: 'reagent-p7-usage', name: 'P7-UsageReagent', category: '有机' },
+      });
+      const stock = await prisma.reagentStock.upsert({
+        where: { id: 'stock-p7-usage' },
+        update: { currentQty: '500.000', initialQty: '500.000' },
+        create: {
+          id: 'stock-p7-usage',
+          reagentId: reagent.id,
+          labId: 'lab-default',
+          batchNo: 'P7-Batch-01',
+          initialQty: '500.000',
+          currentQty: '500.000',
+          unit: 'g',
+        },
+      });
+      const req = await prisma.request.create({
+        data: {
+          applicantId: adminUser!.id,
+          labId: 'lab-default',
+          reagentId: reagent.id,
+          stockId: stock.id,
+          quantity: '1.000',
+          unit: 'g',
+          purpose: 'p7-test',
+          status: 'ISSUED',
+        },
+      });
+      await prisma.issueRecord.create({
+        data: {
+          requestId: req.id,
+          issuerId: adminUser!.id,
+          receiverId: adminUser!.id,
+          stockId: stock.id,
+          actualQty: '1.000',
+        },
+      });
+    });
+
+    it('returns summary + series for SYS_ADMIN', async () => {
+      const r = await request(app.getHttpServer())
+        .get('/reports/usage-trend?range=30d&groupBy=day')
+        .set('Authorization', `Bearer ${adminToken}`);
+      expect(r.status).toBe(200);
+      expect(r.body.summary).toMatchObject({
+        totalIssued: expect.any(String),
+        distinctReagents: expect.any(Number),
+        avgDailyIssued: expect.any(String),
+      });
+      expect(Array.isArray(r.body.series)).toBe(true);
+      expect(Number(r.body.summary.totalIssued)).toBeGreaterThan(0);
+    });
+
+    it('PLAIN_USER scope=self returns only self issues (empty for fresh plain user)', async () => {
+      const r = await request(app.getHttpServer())
+        .get('/reports/usage-trend?range=30d')
+        .set('Authorization', `Bearer ${plainToken}`);
+      expect(r.status).toBe(200);
+      expect(r.body.summary.distinctReagents).toBe(0);
+      expect(r.body.series).toEqual([]);
+    });
+
+    it('rejects custom range without dates', async () => {
+      const r = await request(app.getHttpServer())
+        .get('/reports/usage-trend?range=custom')
+        .set('Authorization', `Bearer ${adminToken}`);
+      expect(r.status).toBe(400);
+    });
+  });
 });
