@@ -251,4 +251,29 @@ describe('Reports (M1 stubs)', () => {
       expect(r.status).toBe(403);
     });
   });
+
+  describe('CSV export', () => {
+    it('usage-trend csv has BOM + headers', async () => {
+      const r = await request(app.getHttpServer())
+        .get('/reports/usage-trend?range=30d&format=csv')
+        .set('Authorization', `Bearer ${adminToken}`);
+      expect(r.status).toBe(200);
+      expect(r.headers['content-type']).toMatch(/text\/csv/);
+      expect(r.headers['content-disposition']).toMatch(/attachment/);
+      expect(r.text.charCodeAt(0)).toBe(0xfeff);
+      const firstLine = r.text.replace(/^﻿/, '').split('\n')[0];
+      expect(firstLine).toContain('bucket');
+      expect(firstLine).toContain('qty');
+    });
+
+    it('inventory-turnover csv has reagent columns', async () => {
+      const r = await request(app.getHttpServer())
+        .get('/reports/inventory-turnover?range=30d&format=csv')
+        .set('Authorization', `Bearer ${adminToken}`);
+      expect(r.status).toBe(200);
+      const firstLine = r.text.replace(/^﻿/, '').split('\n')[0];
+      expect(firstLine).toContain('reagentId');
+      expect(firstLine).toContain('turnoverDays');
+    });
+  });
 });
