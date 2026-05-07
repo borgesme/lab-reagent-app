@@ -115,6 +115,13 @@ export default function HomePage() {
         >
           待办审批
         </Button>
+        <Button
+          size="mini"
+          style={{ marginTop: '12rpx' }}
+          onClick={() => Taro.navigateTo({ url: '/pages/report-summary/index' })}
+        >
+          报表概览
+        </Button>
       </View>
     </View>
   );

@@ -6,6 +6,7 @@ export default defineAppConfig({
     'pages/my-requests/index',
     'pages/approvals/index',
     'pages/notifications/index',
+    'pages/report-summary/index',
   ],
   window: {
     backgroundTextStyle: 'light',
