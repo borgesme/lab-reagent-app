@@ -7,12 +7,16 @@
     "dev:mp": "pnpm --filter @app/miniapp dev:h5",
     "build:mp": "pnpm --filter @app/miniapp build:weapp",
     "test": "pnpm -r test",
+    "test:e2e": "playwright test",
+    "test:e2e:api": "pnpm --filter @app/api test:e2e",
     "lint": "pnpm -r lint",
     "build": "pnpm -r build",
     "db:up": "docker compose up -d postgres redis",
     "db:down": "docker compose down"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
+    "playwright": "^1.59.1",
     "typescript": "5.4.5"
   },
   "packageManager": "pnpm@9.0.0"

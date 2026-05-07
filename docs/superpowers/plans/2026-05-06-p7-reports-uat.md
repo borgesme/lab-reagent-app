@@ -198,7 +198,7 @@ export function resolveReportScope(
   for (const role of user.roles) {
     const s = REPORT_SCOPE_MATRIX[role]?.[type] ?? null;
     if (s === 'all') return { scope: 'all', userId: user.id, labId: user.labId };
-    if (s === 'lab' && best !== 'all') best = 'lab';
+    if (s === 'lab') best = 'lab';
     if (s === 'self' && best === null) best = 'self';
   }
   return best === null ? null : { scope: best, userId: user.id, labId: user.labId };
