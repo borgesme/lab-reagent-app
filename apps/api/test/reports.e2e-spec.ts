@@ -190,4 +190,36 @@ describe('Reports (M1 stubs)', () => {
       expect(r.status).toBe(403);
     });
   });
+
+  describe('purchase-amount', () => {
+    it('SYS_ADMIN groupBy=month returns summary + series', async () => {
+      const r = await request(app.getHttpServer())
+        .get('/reports/purchase-amount?range=365d&groupBy=month')
+        .set('Authorization', `Bearer ${adminToken}`);
+      expect(r.status).toBe(200);
+      expect(r.body.summary).toMatchObject({
+        totalAmount: expect.any(String),
+        batchCount: expect.any(Number),
+        pendingBatchCount: expect.any(Number),
+      });
+      expect(Array.isArray(r.body.series)).toBe(true);
+      for (const row of r.body.series) {
+        expect(row.amount).toMatch(/^\d+\.\d{2}$/);
+      }
+    });
+
+    it('groupBy=supplier returns one row per supplier', async () => {
+      const r = await request(app.getHttpServer())
+        .get('/reports/purchase-amount?range=365d&groupBy=supplier')
+        .set('Authorization', `Bearer ${adminToken}`);
+      expect(r.status).toBe(200);
+    });
+
+    it('PLAIN_USER forbidden', async () => {
+      const r = await request(app.getHttpServer())
+        .get('/reports/purchase-amount')
+        .set('Authorization', `Bearer ${plainToken}`);
+      expect(r.status).toBe(403);
+    });
+  });
 });
