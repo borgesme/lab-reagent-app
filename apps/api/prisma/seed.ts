@@ -51,6 +51,42 @@ async function main() {
       create: { id: `seed-${r.cas}`, ...r },
     });
   }
+  // P7 e2e: extra roles
+  const labHeadRole = await prisma.role.findUniqueOrThrow({ where: { code: 'LAB_HEAD' } });
+  const plainRole = await prisma.role.findUniqueOrThrow({ where: { code: 'PLAIN_USER' } });
+
+  const labHead = await prisma.user.upsert({
+    where: { email: 'labhead@lab.local' },
+    update: {},
+    create: {
+      email: 'labhead@lab.local',
+      name: 'Lab Head',
+      passwordHash: await bcrypt.hash('lab12345', 10),
+      labId: lab.id,
+    },
+  });
+  await prisma.userRole.upsert({
+    where: { userId_roleId: { userId: labHead.id, roleId: labHeadRole.id } },
+    update: {},
+    create: { userId: labHead.id, roleId: labHeadRole.id },
+  });
+
+  const plainUser = await prisma.user.upsert({
+    where: { email: 'plain@lab.local' },
+    update: {},
+    create: {
+      email: 'plain@lab.local',
+      name: 'Plain User',
+      passwordHash: await bcrypt.hash('plain123', 10),
+      labId: lab.id,
+    },
+  });
+  await prisma.userRole.upsert({
+    where: { userId_roleId: { userId: plainUser.id, roleId: plainRole.id } },
+    update: {},
+    create: { userId: plainUser.id, roleId: plainRole.id },
+  });
+
   console.log('seed done');
 }
 
