@@ -48,6 +48,20 @@ export class AuthService {
     return this.issueTokens(user.id, roles);
   }
 
+  async me(userId: string) {
+    const u = await this.prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      include: { roles: { include: { role: true } } },
+    });
+    return {
+      id: u.id,
+      email: u.email,
+      name: u.name,
+      labId: u.labId,
+      roles: u.roles.map((ur) => ur.role.code),
+    };
+  }
+
   async refresh(token: string) {
     try {
       const payload = await this.jwt.verifyAsync(token, {

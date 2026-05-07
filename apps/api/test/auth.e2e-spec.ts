@@ -47,4 +47,24 @@ describe('Auth', () => {
       .send({ email: 'alice@lab.local', password: 'wrong' });
     expect(res.status).toBe(401);
   });
+
+  it('GET /auth/me returns current user with roles', async () => {
+    const login = await request(app.getHttpServer())
+      .post('/auth/login')
+      .send({ email: 'admin@lab.local', password: 'admin123' });
+    expect(login.status).toBe(200);
+    const me = await request(app.getHttpServer())
+      .get('/auth/me')
+      .set('Authorization', `Bearer ${login.body.accessToken}`);
+    expect(me.status).toBe(200);
+    expect(me.body).toMatchObject({
+      email: 'admin@lab.local',
+      roles: expect.arrayContaining(['SYS_ADMIN']),
+    });
+  });
+
+  it('GET /auth/me without token returns 401', async () => {
+    const me = await request(app.getHttpServer()).get('/auth/me');
+    expect(me.status).toBe(401);
+  });
 });

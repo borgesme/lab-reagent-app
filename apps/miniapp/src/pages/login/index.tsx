@@ -20,14 +20,16 @@ export default function LoginPage() {
         method: 'POST',
         data: { email, password },
       });
-      const minimalUser: UserSummary = {
+      // apiRequest reads tokens from auth-store; set them first so /auth/me sees the bearer
+      setSession(tokens, {
         id: '',
         email,
         name: email,
         roles: [],
         labId: null,
-      };
-      setSession(tokens, minimalUser);
+      });
+      const me = await apiRequest<UserSummary>('/auth/me');
+      setSession(tokens, me);
       Taro.switchTab({ url: '/pages/home/index' });
     } catch (e: any) {
       setErr(e.message ?? '登录失败');

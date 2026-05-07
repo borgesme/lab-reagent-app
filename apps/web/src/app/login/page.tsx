@@ -19,7 +19,20 @@ export default function LoginPage() {
         accessToken: string;
         refreshToken: string;
       }>('/auth/login', { method: 'POST', body: { email, password } });
-      setSession(res, { id: '', email, name: email, roles: [], labId: null });
+      const me = await apiFetch<{
+        id: string;
+        email: string;
+        name: string;
+        labId: string | null;
+        roles: string[];
+      }>('/auth/me', { token: res.accessToken });
+      setSession(res, {
+        id: me.id,
+        email: me.email,
+        name: me.name,
+        labId: me.labId,
+        roles: me.roles as any,
+      });
       router.push('/admin/users');
     } catch (e: any) {
       setErr(e.message);
