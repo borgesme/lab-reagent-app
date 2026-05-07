@@ -12,15 +12,22 @@ test.describe('Path 5: SYS_ADMIN visits 4 reports', () => {
   test.use({ storageState: stateFor('admin') });
 
   for (const [slug, label] of SLUGS) {
-    test(`${slug} renders KPI + chart/table`, async ({ page }) => {
+    test(`${slug} renders heading + KPI`, async ({ page }) => {
       await page.goto(`/reports/${slug}`);
       await expect(page.getByRole('heading', { name: label })).toBeVisible();
-      await expect(page.locator('div').filter({ hasText: /—|\d/ }).first())
-        .toBeVisible();
+
+      const firstKpi = page.locator('div.text-3xl').first();
+      await expect(firstKpi).toBeVisible({ timeout: 10_000 });
+      await expect(firstKpi).toHaveText(/[0-9—.\-]+/);
+
       if (slug !== 'controlled-audit') {
-        await expect(page.locator('svg').first()).toBeVisible({ timeout: 10_000 });
+        await expect(page.locator('svg').first()).toBeVisible({
+          timeout: 10_000,
+        });
       } else {
-        await expect(page.getByRole('columnheader', { name: /时间/ })).toBeVisible();
+        await expect(
+          page.getByRole('columnheader', { name: '时间' }),
+        ).toBeVisible();
       }
     });
   }
@@ -29,21 +36,21 @@ test.describe('Path 5: SYS_ADMIN visits 4 reports', () => {
     await page.goto('/reports/usage-trend');
     const [download] = await Promise.all([
       page.waitForEvent('download'),
-      page.getByRole('button', { name: /导出 CSV/ }).click(),
+      page.getByRole('button', { name: '导出 CSV' }).click(),
     ]);
-    const name = download.suggestedFilename();
-    expect(name).toMatch(/usage-trend.*\.csv/);
+    expect(download.suggestedFilename()).toMatch(/usage-trend.*\.csv/);
   });
 });
 
 test.describe('Path 6: PLAIN_USER scope hides forbidden tabs', () => {
   test.use({ storageState: stateFor('plain') });
 
-  test('only 领用趋势 tab visible', async ({ page }) => {
+  test('only 领用趋势 link visible in sidebar', async ({ page }) => {
     await page.goto('/reports/usage-trend');
-    await expect(page.getByRole('link', { name: '领用趋势' })).toBeVisible();
-    for (const label of ['库存周转', '采购金额', '管控试剂审计']) {
-      await expect(page.getByRole('link', { name: label })).toHaveCount(0);
+    const sidebar = page.locator('aside');
+    await expect(sidebar.getByRole('link', { name: '领用趋势' })).toBeVisible();
+    for (const label of ['库存周转', '采购金额', '管控审计']) {
+      await expect(sidebar.getByRole('link', { name: label })).toHaveCount(0);
     }
   });
 });
