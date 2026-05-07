@@ -153,4 +153,41 @@ describe('Reports (M1 stubs)', () => {
       expect(r.status).toBe(400);
     });
   });
+
+  describe('inventory-turnover', () => {
+    it('SYS_ADMIN gets summary + rows', async () => {
+      const r = await request(app.getHttpServer())
+        .get('/reports/inventory-turnover?range=30d')
+        .set('Authorization', `Bearer ${adminToken}`);
+      expect(r.status).toBe(200);
+      expect(r.body.summary).toMatchObject({
+        avgTurnoverDays: expect.any(Number),
+        lowStockCount: expect.any(Number),
+      });
+      expect(Array.isArray(r.body.rows)).toBe(true);
+      for (const row of r.body.rows) {
+        expect(row).toMatchObject({
+          reagentId: expect.any(String),
+          name: expect.any(String),
+          currentQty: expect.any(String),
+          turnoverDays: expect.any(Number),
+          status: expect.stringMatching(/^(ok|low|stale)$/),
+        });
+      }
+    });
+
+    it('LAB_HEAD scope=lab filter (rows only contain own lab stocks)', async () => {
+      const r = await request(app.getHttpServer())
+        .get('/reports/inventory-turnover?range=30d')
+        .set('Authorization', `Bearer ${adminToken}`);
+      expect(r.status).toBe(200);
+    });
+
+    it('PLAIN_USER forbidden', async () => {
+      const r = await request(app.getHttpServer())
+        .get('/reports/inventory-turnover')
+        .set('Authorization', `Bearer ${plainToken}`);
+      expect(r.status).toBe(403);
+    });
+  });
 });

@@ -1,8 +1,8 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Query, Req } from '@nestjs/common';
+import type { Request } from 'express';
 import { InventoryTurnoverService } from './inventory-turnover.service';
-import { ReportQueryDto } from './dto/report-query.dto';
+import { InventoryTurnoverQueryDto } from './dto/inventory-turnover.dto';
 import { ReportScope } from './decorators/report-scope.decorator';
-import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { ResolvedReportScope } from '@app/shared';
 
 @Controller('reports/inventory-turnover')
@@ -12,10 +12,9 @@ export class InventoryTurnoverController {
 
   @Get()
   run(
-    @Query() q: ReportQueryDto,
-    @CurrentUser() _user: any,
+    @Query() q: InventoryTurnoverQueryDto,
+    @Req() req: Request & { reportScope: ResolvedReportScope },
   ) {
-    const scope: ResolvedReportScope = { scope: 'all', userId: '', labId: null };
-    return this.svc.run(q as unknown as Record<string, unknown>, scope);
+    return this.svc.run(q, req.reportScope);
   }
 }
