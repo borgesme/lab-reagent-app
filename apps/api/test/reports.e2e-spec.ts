@@ -276,4 +276,40 @@ describe('Reports (M1 stubs)', () => {
       expect(firstLine).toContain('turnoverDays');
     });
   });
+
+  describe('XLSX export', () => {
+    const binaryParser = (res: any, cb: (err: Error | null, data: Buffer) => void) => {
+      const chunks: Buffer[] = [];
+      res.on('data', (chunk: Buffer) => chunks.push(chunk));
+      res.on('end', () => cb(null, Buffer.concat(chunks)));
+      res.on('error', (err: Error) => cb(err, Buffer.alloc(0)));
+    };
+
+    it('usage-trend xlsx returns binary attachment', async () => {
+      const r = await request(app.getHttpServer())
+        .get('/reports/usage-trend?range=30d&format=xlsx')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .buffer(true)
+        .parse(binaryParser);
+      expect(r.status).toBe(200);
+      expect(r.headers['content-type']).toMatch(
+        /application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet/,
+      );
+      expect(r.headers['content-disposition']).toMatch(/\.xlsx"$/);
+      expect(r.body.slice(0, 2).toString('utf8')).toBe('PK');
+    });
+
+    it('inventory-turnover xlsx contains 2 sheets (parsed back)', async () => {
+      const r = await request(app.getHttpServer())
+        .get('/reports/inventory-turnover?range=30d&format=xlsx')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .buffer(true)
+        .parse(binaryParser);
+      const ExcelJS = require('exceljs');
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.load(r.body);
+      const names = wb.worksheets.map((w: any) => w.name);
+      expect(names.length).toBe(2);
+    });
+  });
 });

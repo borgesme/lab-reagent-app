@@ -1,9 +1,10 @@
-import { Controller, Get, Query, Req, Res } from '@nestjs/common';
+import { Controller, Get, Query, Req, Res, StreamableFile } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { InventoryTurnoverService } from './inventory-turnover.service';
 import { InventoryTurnoverQueryDto } from './dto/inventory-turnover.dto';
 import { ReportScope } from './decorators/report-scope.decorator';
 import { exportCsv } from './exporters/csv.exporter';
+import { exportXlsx } from './exporters/xlsx.exporter';
 import type { ResolvedReportScope } from '@app/shared';
 
 @Controller('reports/inventory-turnover')
@@ -25,6 +26,18 @@ export class InventoryTurnoverController {
         `attachment; filename="inventory-turnover-${new Date().toISOString().slice(0, 10)}.csv"`,
       );
       return exportCsv('inventory-turnover', data);
+    }
+    if (q.format === 'xlsx') {
+      const buf = await exportXlsx('inventory-turnover', data);
+      res.setHeader(
+        'Content-Type',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      );
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="inventory-turnover-${new Date().toISOString().slice(0, 10)}.xlsx"`,
+      );
+      return new StreamableFile(buf);
     }
     return data;
   }

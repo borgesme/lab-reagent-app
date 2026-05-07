@@ -1,9 +1,10 @@
-import { Controller, Get, Query, Req, Res } from '@nestjs/common';
+import { Controller, Get, Query, Req, Res, StreamableFile } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { PurchaseAmountService } from './purchase-amount.service';
 import { PurchaseAmountQueryDto } from './dto/purchase-amount.dto';
 import { ReportScope } from './decorators/report-scope.decorator';
 import { exportCsv } from './exporters/csv.exporter';
+import { exportXlsx } from './exporters/xlsx.exporter';
 import type { ResolvedReportScope } from '@app/shared';
 
 @Controller('reports/purchase-amount')
@@ -25,6 +26,18 @@ export class PurchaseAmountController {
         `attachment; filename="purchase-amount-${new Date().toISOString().slice(0, 10)}.csv"`,
       );
       return exportCsv('purchase-amount', data);
+    }
+    if (q.format === 'xlsx') {
+      const buf = await exportXlsx('purchase-amount', data);
+      res.setHeader(
+        'Content-Type',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      );
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="purchase-amount-${new Date().toISOString().slice(0, 10)}.xlsx"`,
+      );
+      return new StreamableFile(buf);
     }
     return data;
   }
