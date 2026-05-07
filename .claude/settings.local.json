@@ -1,9 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(pnpm --filter @app/api test:e2e -- reports)",
-      "Bash(git add *)",
-      "Bash(git commit *)"
-    ]
-  }
-}

@@ -7,3 +7,14 @@ coverage
 *.log
 apps/api/.env
 .superpowers/
+
+# Playwright
+test-results/
+playwright-report/
+tests/e2e/.auth/
+
+# Claude Code local settings
+.claude/
+
+# Build info
+*.tsbuildinfo
