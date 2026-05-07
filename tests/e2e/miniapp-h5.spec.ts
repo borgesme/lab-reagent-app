@@ -10,7 +10,9 @@ test.describe('miniapp h5: report-summary', () => {
     await page.waitForURL(/login/);
     await page.locator('input').nth(0).fill('labhead@lab.local');
     await page.locator('input').nth(1).fill('lab12345');
-    await page.getByText('登录').click();
+    // Taro <Button>登录</Button> renders as <taro-button-core>; plain getByText is
+    // ambiguous because the nav bar title is also "登录".
+    await page.locator('taro-button-core').filter({ hasText: '登录' }).click();
     await page.waitForURL(/home/, { timeout: 15_000 });
   });
 

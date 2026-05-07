@@ -1,14 +1,8 @@
 import { test, expect } from '@playwright/test';
-import { ensureStorageState, stateFor } from './fixtures/auth';
+import { stateFor } from './fixtures/auth';
 
-test.beforeAll(async ({ browser }) => {
-  for (const role of ['admin', 'labhead', 'plain'] as const) {
-    await ensureStorageState(role, 'http://localhost:3000', async () => {
-      const ctx = await browser.newContext();
-      return ctx.newPage();
-    });
-  }
-});
+// Storage state is pre-warmed by tests/e2e/global-setup.ts so all spec files
+// can read .auth/<role>.json synchronously at worker init.
 
 // Path 1 lives at /my/requests (NOT /reagents). The form uses native <select>
 // for reagent + stock; submit is a <button>提交</button>. Stock options only
