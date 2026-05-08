@@ -148,17 +148,17 @@ export const NAV: NavGroup[] = [
       { href: '/reagents',         icon: 'FlaskConical', label: '试剂百科', roles: '*' },
       { href: '/my/requests',      icon: 'FileText',     label: '我的申请', roles: '*' },
       { href: '/my/purchases',     icon: 'ShoppingCart', label: '我的采购', roles: '*' },
-      { href: '/approvals',        icon: 'CheckSquare',  label: '审批',    roles: ['ADMIN','PI','PURCHASER'] }] },
+      { href: '/approvals',        icon: 'CheckSquare',  label: '审批',     roles: ['LAB_HEAD','SAFETY_OFFICER','SYS_ADMIN'] }] },
   { label: '管理', items: [
-      { href: '/admin/users',         icon: 'Users',       label: '用户',       roles: ['ADMIN'] },
-      { href: '/admin/labs',          icon: 'Beaker',      label: '实验室',     roles: ['ADMIN'] },
-      { href: '/admin/roles',         icon: 'KeyRound',    label: '角色权限',   roles: ['ADMIN'] },
-      { href: '/admin/stocks',        icon: 'Boxes',       label: '库存',       roles: ['ADMIN','REAGENT_ADMIN'] },
-      { href: '/admin/issues',        icon: 'PackageOpen', label: '发放',       roles: ['ADMIN','REAGENT_ADMIN'] },
-      { href: '/admin/ledger',        icon: 'BookText',    label: '台账',       roles: ['ADMIN','REAGENT_ADMIN'] },
-      { href: '/admin/purchases',     icon: 'Truck',       label: '采购管理',   roles: ['ADMIN','REAGENT_ADMIN','PURCHASER'] },
-      { href: '/admin/alerts/config', icon: 'BellRing',    label: '预警配置',   roles: ['ADMIN'] },
-      { href: '/approvals/purchases', icon: 'ClipboardList', label: '采购审批', roles: ['ADMIN','PI','PURCHASER'] },
+      { href: '/admin/users',         icon: 'Users',         label: '用户',       roles: ['SYS_ADMIN'] },
+      { href: '/admin/labs',          icon: 'Beaker',        label: '实验室',     roles: ['SYS_ADMIN'] },
+      { href: '/admin/roles',         icon: 'KeyRound',      label: '角色权限',   roles: ['SYS_ADMIN'] },
+      { href: '/admin/stocks',        icon: 'Boxes',         label: '库存',       roles: ['SYS_ADMIN','REAGENT_ADMIN'] },
+      { href: '/admin/issues',        icon: 'PackageOpen',   label: '发放',       roles: ['SYS_ADMIN','REAGENT_ADMIN'] },
+      { href: '/admin/ledger',        icon: 'BookText',      label: '台账',       roles: ['SYS_ADMIN','REAGENT_ADMIN'] },
+      { href: '/admin/purchases',     icon: 'Truck',         label: '采购管理',   roles: ['SYS_ADMIN','REAGENT_ADMIN'] },
+      { href: '/admin/alerts/config', icon: 'BellRing',      label: '预警配置',   roles: ['SYS_ADMIN'] },
+      { href: '/approvals/purchases', icon: 'ClipboardList', label: '采购审批',   roles: ['LAB_HEAD','SYS_ADMIN'] },
     ] },
   { label: '报表', items: [
       // 用 REPORT_SCOPE_MATRIX 过滤；label 必须保留如下文案（e2e 锁定）
@@ -354,7 +354,7 @@ P8a 完成必须全部满足：
 ### 功能 / 视觉
 
 - [ ] 所有登录后路由共用 `(app)/layout.tsx`，TopBar + Sidebar + Breadcrumb 全部上线
-- [ ] Sidebar 按角色过滤：PLAIN_USER 只看到"工作台/业务"+ 报表里的"领用趋势"；ADMIN 看到全部 group
+- [ ] Sidebar 按角色过滤：PLAIN_USER 只看到"工作台/业务"+ 报表里的"领用趋势"；SYS_ADMIN 看到全部 group
 - [ ] light / dark / system 主题切换可用，刷新后保持
 - [ ] §5 列出的 5 个门面页全部按表格改造点交付
 - [ ] 全站红色错误字 → `toast.error`；裸 `<table>` / `<input>` / `<button>` → shadcn 对应组件
