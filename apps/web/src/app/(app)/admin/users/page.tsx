@@ -1,46 +1,90 @@
 'use client';
 import { useEffect, useState } from 'react';
+import type { ColumnDef } from '@tanstack/react-table';
+import { MoreHorizontal } from 'lucide-react';
+import { toast } from 'sonner';
+import { PageHeader } from '@/components/data/PageHeader';
+import { DataTable } from '@/components/data/DataTable';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { apiFetch } from '@/lib/api-client';
 import { useAuth } from '@/lib/auth-store';
 
+interface UserRow {
+  id: string;
+  email: string;
+  name: string;
+  lab?: { name: string } | null;
+  roles?: Array<{ role: { code: string } }>;
+}
+
+const columns: ColumnDef<UserRow>[] = [
+  { accessorKey: 'email', header: '邮箱' },
+  { accessorKey: 'name', header: '姓名' },
+  {
+    id: 'lab',
+    header: '实验室',
+    cell: ({ row }) => row.original.lab?.name ?? <span className="text-muted-foreground">—</span>,
+  },
+  {
+    id: 'roles',
+    header: '角色',
+    cell: ({ row }) => (
+      <div className="flex flex-wrap gap-1">
+        {(row.original.roles ?? []).map((r) => (
+          <Badge key={r.role.code} variant="secondary">
+            {r.role.code}
+          </Badge>
+        ))}
+      </div>
+    ),
+  },
+  {
+    id: 'actions',
+    header: '',
+    cell: () => (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="操作">
+            <MoreHorizontal className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem disabled>编辑</DropdownMenuItem>
+          <DropdownMenuItem disabled>重置密码</DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    ),
+  },
+];
+
 export default function UsersPage() {
   const token = useAuth((s) => s.tokens?.accessToken);
-  const [users, setUsers] = useState<any[]>([]);
-  const [err, setErr] = useState<string | null>(null);
+  const [data, setData] = useState<UserRow[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!token) return;
-    apiFetch<any[]>('/users', { token })
-      .then(setUsers)
-      .catch((e) => setErr(e.message));
+    setLoading(true);
+    apiFetch<UserRow[]>('/users', { token })
+      .then((d) => setData(d))
+      .catch((e: any) => toast.error(e.message ?? '加载失败'))
+      .finally(() => setLoading(false));
   }, [token]);
 
   return (
-    <section>
-      <h2 className="text-xl font-bold mb-4">用户管理</h2>
-      {err && <p className="text-red-600">{err}</p>}
-      <table className="w-full border">
-        <thead>
-          <tr className="bg-gray-50">
-            <th className="p-2 text-left">邮箱</th>
-            <th className="p-2 text-left">姓名</th>
-            <th className="p-2 text-left">实验室</th>
-            <th className="p-2 text-left">角色</th>
-          </tr>
-        </thead>
-        <tbody>
-          {users.map((u) => (
-            <tr key={u.id} className="border-t">
-              <td className="p-2">{u.email}</td>
-              <td className="p-2">{u.name}</td>
-              <td className="p-2">{u.lab?.name ?? '-'}</td>
-              <td className="p-2">
-                {u.roles?.map((r: any) => r.role.code).join(', ')}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </section>
+    <div>
+      <PageHeader title="用户管理" subtitle="系统全部用户" />
+      <Card className="p-2">
+        <DataTable columns={columns} data={data} loading={loading} testId="users-table" emptyTitle="暂无用户" />
+      </Card>
+    </div>
   );
 }
