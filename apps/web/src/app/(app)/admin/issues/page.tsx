@@ -1,15 +1,27 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import SignatureCanvas from 'react-signature-canvas';
+import type { ColumnDef } from '@tanstack/react-table';
+import { toast } from 'sonner';
+import { PageHeader } from '@/components/data/PageHeader';
+import { DataTable } from '@/components/data/DataTable';
+import { EmptyState } from '@/components/data/EmptyState';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
 import { apiFetch } from '@/lib/api-client';
 import { useAuth } from '@/lib/auth-store';
 
-interface UserLite {
-  id: string;
-  name: string;
-  email: string;
-}
-
+interface UserLite { id: string; name: string; email: string }
 interface RequestItem {
   id: string;
   status: string;
@@ -20,40 +32,64 @@ interface RequestItem {
   reagent: { name: string; hazardLevel?: string; controlType?: string | null };
   stock: { batchNo?: string | null };
   applicant: UserLite;
-  labId?: string;
 }
+
+const issuedColumns: ColumnDef<RequestItem>[] = [
+  { id: 'reagent', header: '试剂', cell: ({ row }) => row.original.reagent.name },
+  {
+    id: 'batchNo',
+    header: '批号',
+    cell: ({ row }) => (
+      <span className="font-mono text-xs">{row.original.stock.batchNo ?? '—'}</span>
+    ),
+  },
+  {
+    id: 'qty',
+    header: '申请量',
+    cell: ({ row }) => `${row.original.quantity} ${row.original.unit}`,
+  },
+  { id: 'applicant', header: '领用人', cell: ({ row }) => row.original.applicant.name },
+  { accessorKey: 'purpose', header: '用途' },
+  {
+    id: 'createdAt',
+    header: '提交时间',
+    cell: ({ row }) =>
+      row.original.createdAt.slice(0, 16).replace('T', ' '),
+  },
+];
 
 export default function IssuesPage() {
   const token = useAuth((s) => s.tokens?.accessToken);
   const [pending, setPending] = useState<RequestItem[]>([]);
   const [issued, setIssued] = useState<RequestItem[]>([]);
   const [witnesses, setWitnesses] = useState<UserLite[]>([]);
-  const [err, setErr] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const [qtyById, setQtyById] = useState<Record<string, string>>({});
   const [witnessById, setWitnessById] = useState<Record<string, string>>({});
   const sigRefs = useRef<Record<string, SignatureCanvas | null>>({});
 
-  async function refresh() {
+  const refresh = useCallback(async () => {
     if (!token) return;
+    setLoading(true);
     try {
       const [ap, iss, users] = await Promise.all([
         apiFetch<RequestItem[]>('/requests?status=APPROVED', { token }),
         apiFetch<RequestItem[]>('/requests?status=ISSUED', { token }),
-        apiFetch<UserLite[]>('/users', { token }).catch(() => []),
+        apiFetch<UserLite[]>('/users', { token }).catch(() => [] as UserLite[]),
       ]);
       setPending(ap);
       setIssued(iss);
       setWitnesses(users);
-      setErr(null);
     } catch (e: any) {
-      setErr(e.message);
+      toast.error(e.message ?? '加载失败');
+    } finally {
+      setLoading(false);
     }
-  }
+  }, [token]);
 
   useEffect(() => {
     refresh();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, [refresh]);
 
   const isCtrl = (r: RequestItem) =>
     r.reagent.hazardLevel === 'CONTROLLED' || !!r.reagent.controlType;
@@ -63,148 +99,134 @@ export default function IssuesPage() {
     try {
       const body: Record<string, unknown> = { actualQty };
       if (isCtrl(r)) {
-        if (!witnessById[r.id]) {
-          throw new Error('请选择见证人');
-        }
-        body.witnessId = witnessById[r.id];
+        if (!witnessById[r.id]) throw new Error('请选择见证人');
         const sig = sigRefs.current[r.id];
-        if (!sig || sig.isEmpty()) {
-          throw new Error('请领用人签名后再发放');
-        }
+        if (!sig || sig.isEmpty()) throw new Error('请领用人签名后再发放');
+        body.witnessId = witnessById[r.id];
         body.signatureDataUrl = sig.toDataURL('image/png');
       }
-      await apiFetch(`/requests/${r.id}/issues`, {
-        method: 'POST',
-        token,
-        body,
-      });
+      await apiFetch(`/requests/${r.id}/issues`, { method: 'POST', token, body });
       sigRefs.current[r.id]?.clear();
       setQtyById((m) => ({ ...m, [r.id]: '' }));
       setWitnessById((m) => ({ ...m, [r.id]: '' }));
-      refresh();
+      toast.success('已发放');
+      await refresh();
     } catch (e: any) {
-      setErr(e.message);
+      toast.error(e.message ?? '发放失败');
     }
   }
 
   return (
-    <section>
-      <h2 className="text-xl font-bold mb-4">发放管理</h2>
-      {err && <p className="text-red-600 mb-2">{err}</p>}
+    <div>
+      <PageHeader title="发放管理" subtitle="待发放申请与已发放台账" />
 
-      <h3 className="font-semibold mt-4 mb-2">待发放</h3>
-      {pending.length === 0 && <p className="text-gray-500">无</p>}
-      <ul className="space-y-3 mb-6">
-        {pending.map((r) => {
-          const ctrl = isCtrl(r);
-          return (
-            <li key={r.id} className="border p-3 rounded">
-              <div className="flex justify-between">
-                <div>
-                  <div className="font-medium">
-                    {r.reagent.name} · 批号 {r.stock.batchNo ?? '-'} · 申请
-                    {r.quantity}
-                    {r.unit}
-                    {ctrl && (
-                      <span className="ml-2 text-red-600 text-sm">[管控]</span>
-                    )}
-                  </div>
-                  <div className="text-sm text-gray-700">
-                    {r.applicant.name} · {r.purpose}
-                  </div>
-                </div>
-                <input
-                  className="border p-1 w-24 text-sm"
-                  placeholder={`实际量 (${r.unit})`}
-                  value={qtyById[r.id] ?? ''}
-                  onChange={(e) =>
-                    setQtyById((m) => ({ ...m, [r.id]: e.target.value }))
-                  }
-                />
-              </div>
-              {ctrl && (
-                <div className="mt-2 space-y-2">
-                  <select
-                    className="border p-1 text-sm"
-                    value={witnessById[r.id] ?? ''}
-                    onChange={(e) =>
-                      setWitnessById((m) => ({
-                        ...m,
-                        [r.id]: e.target.value,
-                      }))
-                    }
-                  >
-                    <option value="">选择见证人</option>
-                    {witnesses.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.name} ({u.email})
-                      </option>
-                    ))}
-                  </select>
-                  <div>
-                    <div className="text-sm text-gray-600 mb-1">
-                      领用人签名：
+      <h2 className="mb-3 text-base font-semibold">待发放</h2>
+      {pending.length === 0 ? (
+        <EmptyState title="暂无待发放申请" />
+      ) : (
+        <ul className="mb-6 space-y-3" data-testid="issues-pending">
+          {pending.map((r) => {
+            const ctrl = isCtrl(r);
+            return (
+              <li key={r.id}>
+                <Card className="p-4">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold">{r.reagent.name}</span>
+                        {ctrl && <Badge variant="destructive">管控</Badge>}
+                        <span className="text-sm text-muted-foreground">
+                          批号 {r.stock.batchNo ?? '—'} · 申请 {r.quantity}
+                          {r.unit}
+                        </span>
+                      </div>
+                      <div className="text-sm">
+                        {r.applicant.name} · {r.purpose}
+                      </div>
                     </div>
-                    <SignatureCanvas
-                      ref={(el) => {
-                        sigRefs.current[r.id] = el;
-                      }}
-                      canvasProps={{
-                        width: 400,
-                        height: 120,
-                        className: 'border',
-                      }}
-                    />
-                    <button
-                      type="button"
-                      className="text-xs text-gray-500 underline ml-2"
-                      onClick={() => sigRefs.current[r.id]?.clear()}
-                    >
-                      清空
-                    </button>
+                    <div className="flex items-end gap-2">
+                      <Input
+                        className="w-32"
+                        placeholder={`实际量 (${r.unit})`}
+                        value={qtyById[r.id] ?? ''}
+                        onChange={(e) =>
+                          setQtyById((m) => ({ ...m, [r.id]: e.target.value }))
+                        }
+                      />
+                      {!ctrl && (
+                        <Button size="sm" onClick={() => issue(r)}>发放</Button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              )}
-              <button
-                className="bg-blue-600 text-white px-3 py-1 text-sm mt-2"
-                onClick={() => issue(r)}
-              >
-                发放
-              </button>
-            </li>
-          );
-        })}
-      </ul>
 
-      <h3 className="font-semibold mt-4 mb-2">已发放台账</h3>
-      <table className="w-full border">
-        <thead>
-          <tr className="bg-gray-50">
-            <th className="p-2 text-left">试剂</th>
-            <th className="p-2 text-left">批号</th>
-            <th className="p-2 text-left">申请量</th>
-            <th className="p-2 text-left">领用人</th>
-            <th className="p-2 text-left">用途</th>
-            <th className="p-2 text-left">提交时间</th>
-          </tr>
-        </thead>
-        <tbody>
-          {issued.map((r) => (
-            <tr key={r.id} className="border-t">
-              <td className="p-2">{r.reagent.name}</td>
-              <td className="p-2">{r.stock.batchNo ?? '-'}</td>
-              <td className="p-2">
-                {r.quantity} {r.unit}
-              </td>
-              <td className="p-2">{r.applicant.name}</td>
-              <td className="p-2">{r.purpose}</td>
-              <td className="p-2">
-                {r.createdAt.slice(0, 16).replace('T', ' ')}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </section>
+                  {ctrl && (
+                    <>
+                      <Separator className="my-3" />
+                      <div className="space-y-2">
+                        <Select
+                          value={witnessById[r.id] ?? ''}
+                          onValueChange={(v) =>
+                            setWitnessById((m) => ({ ...m, [r.id]: v }))
+                          }
+                        >
+                          <SelectTrigger className="w-72">
+                            <SelectValue placeholder="选择见证人" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {witnesses.map((u) => (
+                              <SelectItem key={u.id} value={u.id}>
+                                {u.name}（{u.email}）
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <div>
+                          <div className="mb-1 text-sm text-muted-foreground">
+                            领用人签名
+                          </div>
+                          <SignatureCanvas
+                            ref={(el) => {
+                              sigRefs.current[r.id] = el;
+                            }}
+                            canvasProps={{
+                              width: 400,
+                              height: 120,
+                              className: 'rounded border bg-background',
+                            }}
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="mt-1 h-7 px-2 text-xs"
+                            onClick={() => sigRefs.current[r.id]?.clear()}
+                          >
+                            清空签名
+                          </Button>
+                        </div>
+                        <div className="flex justify-end">
+                          <Button size="sm" onClick={() => issue(r)}>发放</Button>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </Card>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      <h2 className="mb-3 text-base font-semibold">已发放台账</h2>
+      <Card className="p-2">
+        <DataTable
+          columns={issuedColumns}
+          data={issued}
+          loading={loading}
+          testId="issues-issued"
+          emptyTitle="暂无已发放记录"
+        />
+      </Card>
+    </div>
   );
 }
