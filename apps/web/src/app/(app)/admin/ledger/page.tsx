@@ -1,15 +1,16 @@
 'use client';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ColumnDef } from '@tanstack/react-table';
+import { format } from 'date-fns';
 import { Download } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/data/PageHeader';
 import { DataTable } from '@/components/data/DataTable';
 import { Toolbar } from '@/components/data/Toolbar';
 import { Card } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { DatePicker } from '@/components/ui/date-picker';
 import { apiFetch, apiBaseUrl } from '@/lib/api-client';
 import { useAuth } from '@/lib/auth-store';
 
@@ -76,16 +77,16 @@ export default function LedgerPage() {
   const [rows, setRows] = useState<Row[]>([]);
   const [snaps, setSnaps] = useState<Snapshot[]>([]);
   const [loading, setLoading] = useState(true);
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
+  const [from, setFrom] = useState<Date | undefined>(undefined);
+  const [to, setTo] = useState<Date | undefined>(undefined);
 
   const refresh = useCallback(async () => {
     if (!token) return;
     setLoading(true);
     try {
       const qs = new URLSearchParams({ format: 'json' });
-      if (from) qs.set('from', from);
-      if (to) qs.set('to', to);
+      if (from) qs.set('from', format(from, 'yyyy-MM-dd'));
+      if (to) qs.set('to', format(to, 'yyyy-MM-dd'));
       const [data, snapList] = await Promise.all([
         apiFetch<Row[]>(`/controlled-ledger?${qs}`, { token }),
         apiFetch<Snapshot[]>('/controlled-ledger/snapshots', { token }),
@@ -127,8 +128,8 @@ export default function LedgerPage() {
   const downloadCsv = useMemo(
     () => () => {
       const qs = new URLSearchParams({ format: 'csv' });
-      if (from) qs.set('from', from);
-      if (to) qs.set('to', to);
+      if (from) qs.set('from', format(from, 'yyyy-MM-dd'));
+      if (to) qs.set('to', format(to, 'yyyy-MM-dd'));
       download(`/controlled-ledger?${qs}`, 'controlled-ledger.csv');
     },
     [from, to, download],
@@ -140,19 +141,9 @@ export default function LedgerPage() {
       <Toolbar
         filters={
           <>
-            <Input
-              type="date"
-              value={from}
-              onChange={(e) => setFrom(e.target.value)}
-              className="w-40"
-            />
+            <DatePicker value={from} onChange={setFrom} placeholder="开始日期" />
             <span className="text-muted-foreground text-sm">至</span>
-            <Input
-              type="date"
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
-              className="w-40"
-            />
+            <DatePicker value={to} onChange={setTo} placeholder="结束日期" />
           </>
         }
         actions={
