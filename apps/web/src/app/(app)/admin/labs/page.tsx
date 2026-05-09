@@ -1,58 +1,142 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { ColumnDef } from '@tanstack/react-table';
+import { Plus } from 'lucide-react';
+import { z } from 'zod';
+import { toast } from 'sonner';
+import { PageHeader } from '@/components/data/PageHeader';
+import { DataTable } from '@/components/data/DataTable';
+import { FormDialog } from '@/components/data/FormDialog';
+import {
+  FormField,
+  FormItem,
+  FormLabel,
+  FormControl,
+  FormMessage,
+} from '@/components/ui/form';
+import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { apiFetch } from '@/lib/api-client';
 import { useAuth } from '@/lib/auth-store';
 
+interface Lab {
+  id: string;
+  name: string;
+  building?: string | null;
+}
+
+const schema = z.object({
+  name: z.string().min(1, '名称必填'),
+  building: z.string().optional(),
+});
+
+const columns: ColumnDef<Lab>[] = [
+  { accessorKey: 'name', header: '名称' },
+  {
+    id: 'building',
+    header: '地点',
+    cell: ({ row }) =>
+      row.original.building ?? (
+        <span className="text-muted-foreground">—</span>
+      ),
+  },
+];
+
 export default function LabsPage() {
   const token = useAuth((s) => s.tokens?.accessToken);
-  const [labs, setLabs] = useState<any[]>([]);
-  const [name, setName] = useState('');
-  const [building, setBuilding] = useState('');
+  const [data, setData] = useState<Lab[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [formOpen, setFormOpen] = useState(false);
 
-  const refresh = () => apiFetch<any[]>('/labs', { token }).then(setLabs);
-
-  useEffect(() => {
-    if (token) refresh();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  const refresh = useCallback(async () => {
+    if (!token) return;
+    setLoading(true);
+    try {
+      const list = await apiFetch<Lab[]>('/labs', { token });
+      setData(list);
+    } catch (e: any) {
+      toast.error(e.message ?? '加载失败');
+    } finally {
+      setLoading(false);
+    }
   }, [token]);
 
-  async function onCreate(e: React.FormEvent) {
-    e.preventDefault();
-    await apiFetch('/labs', {
-      method: 'POST',
-      body: { name, building },
-      token,
-    });
-    setName('');
-    setBuilding('');
+  useEffect(() => {
     refresh();
-  }
+  }, [refresh]);
+
+  const defaultValues = useMemo(() => ({ name: '', building: '' }), []);
 
   return (
-    <section>
-      <h2 className="text-xl font-bold mb-4">实验室管理</h2>
-      <form onSubmit={onCreate} className="flex gap-2 mb-4">
-        <input
-          className="border p-2"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="名称"
+    <div>
+      <PageHeader
+        title="实验室管理"
+        subtitle="系统在管实验室"
+        actions={
+          <Button onClick={() => setFormOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" /> 新增
+          </Button>
+        }
+      />
+      <Card className="p-2">
+        <DataTable
+          columns={columns}
+          data={data}
+          loading={loading}
+          testId="labs-table"
+          emptyTitle="暂无实验室"
         />
-        <input
-          className="border p-2"
-          value={building}
-          onChange={(e) => setBuilding(e.target.value)}
-          placeholder="地点"
-        />
-        <button className="bg-blue-600 text-white px-4">新增</button>
-      </form>
-      <ul>
-        {labs.map((l) => (
-          <li key={l.id}>
-            {l.name} — {l.building ?? '-'}
-          </li>
-        ))}
-      </ul>
-    </section>
+      </Card>
+
+      <FormDialog
+        open={formOpen}
+        onOpenChange={setFormOpen}
+        schema={schema}
+        defaultValues={defaultValues}
+        title="新增实验室"
+        onSubmit={async (values) => {
+          try {
+            await apiFetch('/labs', {
+              method: 'POST',
+              token,
+              body: { name: values.name, building: values.building || undefined },
+            });
+            toast.success('已新增');
+            setFormOpen(false);
+            await refresh();
+          } catch (e: any) {
+            toast.error(e.message ?? '保存失败');
+            throw e;
+          }
+        }}
+        fields={(form) => (
+          <>
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>名称</FormLabel>
+                  <FormControl><Input {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="building"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>地点</FormLabel>
+                  <FormControl><Input {...field} placeholder="可选" /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </>
+        )}
+      />
+    </div>
   );
 }
