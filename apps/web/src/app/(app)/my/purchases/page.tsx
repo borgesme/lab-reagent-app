@@ -1,29 +1,71 @@
 'use client';
-
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { ColumnDef } from '@tanstack/react-table';
+import { MoreHorizontal, Plus } from 'lucide-react';
+import { z } from 'zod';
+import { toast } from 'sonner';
+import { PageHeader } from '@/components/data/PageHeader';
+import { DataTable } from '@/components/data/DataTable';
+import { FormDialog } from '@/components/data/FormDialog';
+import { ConfirmDialog } from '@/components/data/ConfirmDialog';
+import {
+  FormField,
+  FormItem,
+  FormLabel,
+  FormControl,
+  FormMessage,
+} from '@/components/ui/form';
+import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { apiFetch } from '@/lib/api-client';
 import { useAuth } from '@/lib/auth-store';
-import { RequireAuth } from '@/components/RequireAuth';
 import type { PurchaseRequestSummary, ReagentSummary } from '@app/shared';
 
 type PurchaseRow = PurchaseRequestSummary & {
   reagent?: { id: string; name: string } | null;
 };
 
+const schema = z.object({
+  reagentId: z.string().min(1, '请选择试剂'),
+  quantity: z.string().min(1, '数量必填'),
+  unit: z.string().min(1, '单位必填'),
+  reason: z.string().min(1, '采购理由必填'),
+});
+
+function statusVariant(s: string): 'default' | 'secondary' | 'destructive' | 'outline' {
+  if (s === 'PENDING') return 'secondary';
+  if (s === 'APPROVED') return 'default';
+  if (s === 'REJECTED' || s === 'CANCELLED') return 'destructive';
+  return 'outline';
+}
+
 export default function MyPurchasesPage() {
   const token = useAuth((s) => s.tokens?.accessToken);
   const [items, setItems] = useState<PurchaseRow[]>([]);
   const [reagents, setReagents] = useState<ReagentSummary[]>([]);
-  const [form, setForm] = useState({
-    reagentId: '',
-    quantity: '',
-    unit: 'mL',
-    reason: '',
-  });
-  const [err, setErr] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [formOpen, setFormOpen] = useState(false);
+  const [cancelling, setCancelling] = useState<PurchaseRow | null>(null);
 
-  async function refresh() {
+  const refresh = useCallback(async () => {
     if (!token) return;
+    setLoading(true);
     try {
       const [list, rs] = await Promise.all([
         apiFetch<PurchaseRow[]>('/purchases/mine', { token }),
@@ -32,132 +74,195 @@ export default function MyPurchasesPage() {
       setItems(list);
       setReagents(rs);
     } catch (e: any) {
-      setErr(e.message);
+      toast.error(e.message ?? '加载失败');
+    } finally {
+      setLoading(false);
     }
-  }
+  }, [token]);
 
   useEffect(() => {
     refresh();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, [refresh]);
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    try {
-      await apiFetch('/purchases', {
-        method: 'POST',
-        token,
-        body: form,
-      });
-      setForm({ reagentId: '', quantity: '', unit: 'mL', reason: '' });
-      setErr(null);
-      await refresh();
-    } catch (e: any) {
-      setErr(e.message);
-    }
-  }
+  const defaultValues = useMemo(
+    () => ({ reagentId: '', quantity: '', unit: 'mL', reason: '' }),
+    [],
+  );
 
-  async function cancel(id: string) {
-    if (!token) return;
-    try {
-      await apiFetch(`/purchases/${id}/cancel`, { method: 'POST', token });
-      await refresh();
-    } catch (e: any) {
-      setErr(e.message);
-    }
-  }
+  const columns: ColumnDef<PurchaseRow>[] = useMemo(
+    () => [
+      {
+        id: 'createdAt',
+        header: '时间',
+        cell: ({ row }) =>
+          new Date(row.original.createdAt).toLocaleString(),
+      },
+      {
+        id: 'reagent',
+        header: '试剂',
+        cell: ({ row }) => row.original.reagent?.name ?? row.original.reagentId,
+      },
+      {
+        id: 'qty',
+        header: '数量',
+        cell: ({ row }) => `${row.original.quantity} ${row.original.unit}`,
+      },
+      { accessorKey: 'reason', header: '理由' },
+      {
+        id: 'status',
+        header: '状态',
+        cell: ({ row }) => (
+          <Badge variant={statusVariant(row.original.status)}>
+            {row.original.status}
+          </Badge>
+        ),
+      },
+      {
+        id: 'actions',
+        header: '',
+        cell: ({ row }) =>
+          row.original.status === 'PENDING' ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="操作">
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  className="text-destructive"
+                  onClick={() => setCancelling(row.original)}
+                >
+                  取消
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : null,
+      },
+    ],
+    [],
+  );
 
   return (
-    <RequireAuth>
-      <main className="p-6">
-        <h1 className="text-2xl font-bold mb-4">我的采购申请</h1>
-        {err && <p className="text-red-600 mb-2">{err}</p>}
+    <div>
+      <PageHeader
+        title="我的采购申请"
+        actions={
+          <Button onClick={() => setFormOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" /> 新采购申请
+          </Button>
+        }
+      />
+      <Card className="p-2">
+        <DataTable
+          columns={columns}
+          data={items}
+          loading={loading}
+          testId="my-purchases-table"
+          emptyTitle="暂无采购申请"
+        />
+      </Card>
 
-        <form
-          onSubmit={submit}
-          className="mb-6 border p-4 rounded space-y-2 bg-gray-50"
-        >
-          <div className="flex gap-2">
-            <select
-              className="border px-2 py-1"
-              value={form.reagentId}
-              onChange={(e) => setForm({ ...form, reagentId: e.target.value })}
-              required
-            >
-              <option value="">选择试剂</option>
-              {reagents.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.name}
-                </option>
-              ))}
-            </select>
-            <input
-              className="border px-2 py-1"
-              placeholder="数量"
-              value={form.quantity}
-              onChange={(e) => setForm({ ...form, quantity: e.target.value })}
-              required
+      <FormDialog
+        open={formOpen}
+        onOpenChange={setFormOpen}
+        schema={schema}
+        defaultValues={defaultValues}
+        title="新采购申请"
+        onSubmit={async (values) => {
+          try {
+            await apiFetch('/purchases', { method: 'POST', token, body: values });
+            toast.success('已提交');
+            setFormOpen(false);
+            await refresh();
+          } catch (e: any) {
+            toast.error(e.message ?? '提交失败');
+            throw e;
+          }
+        }}
+        fields={(form) => (
+          <>
+            <FormField
+              control={form.control}
+              name="reagentId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>试剂</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger><SelectValue placeholder="选择试剂" /></SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {reagents.map((r) => (
+                        <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-            <input
-              className="border px-2 py-1 w-20"
-              placeholder="单位"
-              value={form.unit}
-              onChange={(e) => setForm({ ...form, unit: e.target.value })}
-              required
+            <div className="grid grid-cols-2 gap-3">
+              <FormField
+                control={form.control}
+                name="quantity"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>数量</FormLabel>
+                    <FormControl><Input {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="unit"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>单位</FormLabel>
+                    <FormControl><Input {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            <FormField
+              control={form.control}
+              name="reason"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>采购理由</FormLabel>
+                  <FormControl><Textarea rows={3} {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </div>
-          <textarea
-            className="border w-full px-2 py-1"
-            placeholder="采购理由"
-            value={form.reason}
-            onChange={(e) => setForm({ ...form, reason: e.target.value })}
-            required
-          />
-          <button className="bg-blue-600 text-white px-3 py-1 rounded">
-            提交
-          </button>
-        </form>
+          </>
+        )}
+      />
 
-        <table className="w-full border">
-          <thead className="bg-gray-100">
-            <tr>
-              <th className="border px-2 py-1">时间</th>
-              <th className="border px-2 py-1">试剂</th>
-              <th className="border px-2 py-1">数量</th>
-              <th className="border px-2 py-1">理由</th>
-              <th className="border px-2 py-1">状态</th>
-              <th className="border px-2 py-1">操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((p) => (
-              <tr key={p.id} className="border-t">
-                <td className="border px-2 py-1">
-                  {new Date(p.createdAt).toLocaleString()}
-                </td>
-                <td className="border px-2 py-1">
-                  {p.reagent?.name ?? p.reagentId}
-                </td>
-                <td className="border px-2 py-1">
-                  {p.quantity} {p.unit}
-                </td>
-                <td className="border px-2 py-1">{p.reason}</td>
-                <td className="border px-2 py-1">{p.status}</td>
-                <td className="border px-2 py-1">
-                  {p.status === 'PENDING' && (
-                    <button
-                      className="text-red-600 underline"
-                      onClick={() => cancel(p.id)}
-                    >
-                      取消
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </main>
-    </RequireAuth>
+      <ConfirmDialog
+        open={!!cancelling}
+        onOpenChange={(o) => !o && setCancelling(null)}
+        title="取消采购申请"
+        description={`确认取消该采购申请？`}
+        confirmLabel="确认取消"
+        onConfirm={async () => {
+          if (!cancelling) return;
+          try {
+            await apiFetch(`/purchases/${cancelling.id}/cancel`, {
+              method: 'POST',
+              token,
+            });
+            toast.success('已取消');
+            setCancelling(null);
+            await refresh();
+          } catch (e: any) {
+            toast.error(e.message ?? '取消失败');
+            throw e;
+          }
+        }}
+      />
+    </div>
   );
 }
