@@ -77,6 +77,8 @@ apps/web/src/
 
 shadcn add 自动引入：`cmdk`（Command）、`@radix-ui/react-dialog` 已在 P8a 中装过（Dialog 复用）。
 
+ledger 日期筛选额外引入：`@radix-ui/react-popover`、`react-day-picker@10`、`date-fns@4`（由 `pnpm dlx shadcn@latest add popover calendar` 自动装）。注意：shadcn 模板生成的 `components/ui/calendar.tsx` 默认含 `table: "w-full border-collapse"` 一行，在 react-day-picker v10 的 `ClassNames` 类型里已删除该字段，需手动删除该行才能通过 tsc。
+
 ## 组件契约
 
 ### MobileSidebar
@@ -311,11 +313,22 @@ return (
 
 ### 只读 admin 页（ledger）
 
+`from`/`to` 日期筛选使用自封装的 `DatePicker`（`components/ui/date-picker.tsx`，shadcn `Popover` + `Calendar` 组合），state 类型为 `Date | undefined`，调 API 时 `format(d, 'yyyy-MM-dd')` 序列化。
+
 ```tsx
 return (
   <div>
     <PageHeader title="台账" subtitle="出入库流水" />
-    <Toolbar filters={...搜索/筛选} />
+    <Toolbar
+      filters={
+        <>
+          <DatePicker value={from} onChange={setFrom} placeholder="开始日期" />
+          <span className="text-muted-foreground text-sm">至</span>
+          <DatePicker value={to} onChange={setTo} placeholder="结束日期" />
+        </>
+      }
+      actions={<Button variant="outline" size="sm" onClick={downloadCsv}>...下载 CSV</Button>}
+    />
     <Card className="p-2">
       <DataTable columns={columns} data={data} loading={loading} testId="ledger-table" />
     </Card>

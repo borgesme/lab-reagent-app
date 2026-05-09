@@ -2515,8 +2515,77 @@ git commit -m "feat(web/p8b): /admin/alerts/config → DataTable + FormDialog up
 
 **Files:**
 - Modify: `apps/web/src/app/(app)/admin/ledger/page.tsx`
+- New: `apps/web/src/components/ui/date-picker.tsx`（Popover + Calendar 封装）
+- Add via `pnpm dlx shadcn@latest add -y popover calendar`：`components/ui/popover.tsx`、`components/ui/calendar.tsx`（生成的 calendar.tsx 在 react-day-picker v10 下要去掉 `table` 这一行 className，否则 tsc 报 ClassNames 类型错）
 
 **已有 API：** `GET /controlled-ledger?from&to&format=json|csv`、`GET /controlled-ledger/snapshots`、`GET /controlled-ledger/snapshots/:id`。无写操作。
+
+- [ ] **Step 0: 装 popover + calendar 并写 DatePicker 包装**
+
+```bash
+cd apps/web && pnpm dlx shadcn@latest add -y popover calendar
+# 然后手动删掉 components/ui/calendar.tsx 中 `table: "w-full border-collapse",` 这一行（react-day-picker v10 ClassNames 不再支持 table）
+```
+
+`apps/web/src/components/ui/date-picker.tsx`（新建）：
+
+```tsx
+'use client';
+
+import * as React from 'react';
+import { format } from 'date-fns';
+import { Calendar as CalendarIcon } from 'lucide-react';
+
+import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { Calendar } from '@/components/ui/calendar';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+
+export interface DatePickerProps {
+  value?: Date;
+  onChange?: (date: Date | undefined) => void;
+  placeholder?: string;
+  className?: string;
+  buttonClassName?: string;
+  disabled?: boolean;
+}
+
+export function DatePicker({
+  value,
+  onChange,
+  placeholder = '选择日期',
+  className,
+  buttonClassName,
+  disabled,
+}: DatePickerProps) {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          disabled={disabled}
+          className={cn(
+            'w-40 justify-start text-left font-normal',
+            !value && 'text-muted-foreground',
+            buttonClassName,
+          )}
+        >
+          <CalendarIcon className="mr-2 h-4 w-4" />
+          {value ? format(value, 'yyyy-MM-dd') : <span>{placeholder}</span>}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className={cn('w-auto p-0', className)} align="start">
+        <Calendar mode="single" selected={value} onSelect={onChange} autoFocus />
+      </PopoverContent>
+    </Popover>
+  );
+}
+```
 
 - [ ] **Step 1: 重写**
 
@@ -2526,15 +2595,16 @@ git commit -m "feat(web/p8b): /admin/alerts/config → DataTable + FormDialog up
 'use client';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ColumnDef } from '@tanstack/react-table';
+import { format } from 'date-fns';
 import { Download } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/data/PageHeader';
 import { DataTable } from '@/components/data/DataTable';
 import { Toolbar } from '@/components/data/Toolbar';
 import { Card } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { DatePicker } from '@/components/ui/date-picker';
 import { apiFetch, apiBaseUrl } from '@/lib/api-client';
 import { useAuth } from '@/lib/auth-store';
 
@@ -2601,16 +2671,16 @@ export default function LedgerPage() {
   const [rows, setRows] = useState<Row[]>([]);
   const [snaps, setSnaps] = useState<Snapshot[]>([]);
   const [loading, setLoading] = useState(true);
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
+  const [from, setFrom] = useState<Date | undefined>(undefined);
+  const [to, setTo] = useState<Date | undefined>(undefined);
 
   const refresh = useCallback(async () => {
     if (!token) return;
     setLoading(true);
     try {
       const qs = new URLSearchParams({ format: 'json' });
-      if (from) qs.set('from', from);
-      if (to) qs.set('to', to);
+      if (from) qs.set('from', format(from, 'yyyy-MM-dd'));
+      if (to) qs.set('to', format(to, 'yyyy-MM-dd'));
       const [data, snapList] = await Promise.all([
         apiFetch<Row[]>(`/controlled-ledger?${qs}`, { token }),
         apiFetch<Snapshot[]>('/controlled-ledger/snapshots', { token }),
@@ -2628,32 +2698,35 @@ export default function LedgerPage() {
     refresh();
   }, [refresh]);
 
-  async function download(path: string, filename: string) {
-    try {
-      const resp = await fetch(apiBaseUrl + path, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const blob = await resp.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (e: any) {
-      toast.error(e.message ?? '下载失败');
-    }
-  }
+  const download = useCallback(
+    async (path: string, filename: string) => {
+      try {
+        const resp = await fetch(apiBaseUrl + path, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const blob = await resp.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(url);
+      } catch (e: any) {
+        toast.error(e.message ?? '下载失败');
+      }
+    },
+    [token],
+  );
 
   const downloadCsv = useMemo(
     () => () => {
       const qs = new URLSearchParams({ format: 'csv' });
-      if (from) qs.set('from', from);
-      if (to) qs.set('to', to);
+      if (from) qs.set('from', format(from, 'yyyy-MM-dd'));
+      if (to) qs.set('to', format(to, 'yyyy-MM-dd'));
       download(`/controlled-ledger?${qs}`, 'controlled-ledger.csv');
     },
-    [from, to, token],
+    [from, to, download],
   );
 
   return (
@@ -2662,19 +2735,9 @@ export default function LedgerPage() {
       <Toolbar
         filters={
           <>
-            <Input
-              type="date"
-              value={from}
-              onChange={(e) => setFrom(e.target.value)}
-              className="w-40"
-            />
+            <DatePicker value={from} onChange={setFrom} placeholder="开始日期" />
             <span className="text-muted-foreground text-sm">至</span>
-            <Input
-              type="date"
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
-              className="w-40"
-            />
+            <DatePicker value={to} onChange={setTo} placeholder="结束日期" />
           </>
         }
         actions={
@@ -2735,8 +2798,12 @@ export default function LedgerPage() {
 
 ```bash
 pnpm -F @app/web exec tsc --noEmit
-git add "apps/web/src/app/(app)/admin/ledger/page.tsx"
-git commit -m "feat(web/p8b): /admin/ledger → DataTable + Toolbar date filter + snapshot list"
+git add "apps/web/src/app/(app)/admin/ledger/page.tsx" \
+  apps/web/src/components/ui/date-picker.tsx \
+  apps/web/src/components/ui/popover.tsx \
+  apps/web/src/components/ui/calendar.tsx \
+  apps/web/package.json pnpm-lock.yaml
+git commit -m "feat(web/p8b): /admin/ledger → DataTable + Toolbar DatePicker + snapshot list"
 ```
 
 ---
