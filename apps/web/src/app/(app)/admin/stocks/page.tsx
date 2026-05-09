@@ -1,5 +1,29 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { ColumnDef } from '@tanstack/react-table';
+import { Plus } from 'lucide-react';
+import { z } from 'zod';
+import { toast } from 'sonner';
+import { PageHeader } from '@/components/data/PageHeader';
+import { DataTable } from '@/components/data/DataTable';
+import { FormDialog } from '@/components/data/FormDialog';
+import {
+  FormField,
+  FormItem,
+  FormLabel,
+  FormControl,
+  FormMessage,
+} from '@/components/ui/form';
+import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { apiFetch } from '@/lib/api-client';
 import { useAuth } from '@/lib/auth-store';
 
@@ -13,33 +37,57 @@ interface Stock {
   reagent: { id: string; name: string };
   lab: { id: string; name: string };
 }
+interface Reagent { id: string; name: string }
+interface Lab { id: string; name: string }
 
-interface Reagent {
-  id: string;
-  name: string;
-}
+const schema = z.object({
+  reagentId: z.string().min(1, '请选择试剂'),
+  labId: z.string().min(1, '请选择实验室'),
+  batchNo: z.string().optional(),
+  qty: z.string().min(1, '数量必填'),
+  unit: z.string().min(1, '单位必填'),
+  location: z.string().optional(),
+});
 
-interface Lab {
-  id: string;
-  name: string;
-}
+const columns: ColumnDef<Stock>[] = [
+  { id: 'reagent', header: '试剂', cell: ({ row }) => row.original.reagent.name },
+  {
+    id: 'batchNo',
+    header: '批号',
+    cell: ({ row }) => (
+      <span className="font-mono text-xs">{row.original.batchNo ?? '—'}</span>
+    ),
+  },
+  {
+    id: 'qty',
+    header: '当前量',
+    cell: ({ row }) => `${row.original.currentQty} ${row.original.unit}`,
+  },
+  {
+    id: 'location',
+    header: '位置',
+    cell: ({ row }) => row.original.location ?? '—',
+  },
+  {
+    id: 'expire',
+    header: '有效期',
+    cell: ({ row }) =>
+      row.original.expireDate ? row.original.expireDate.slice(0, 10) : '—',
+  },
+  { id: 'lab', header: '实验室', cell: ({ row }) => row.original.lab.name },
+];
 
 export default function StocksPage() {
   const token = useAuth((s) => s.tokens?.accessToken);
   const [stocks, setStocks] = useState<Stock[]>([]);
   const [reagents, setReagents] = useState<Reagent[]>([]);
   const [labs, setLabs] = useState<Lab[]>([]);
-  const [err, setErr] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [formOpen, setFormOpen] = useState(false);
 
-  const [reagentId, setReagentId] = useState('');
-  const [labId, setLabId] = useState('');
-  const [batchNo, setBatchNo] = useState('');
-  const [qty, setQty] = useState('');
-  const [unit, setUnit] = useState('g');
-  const [location, setLocation] = useState('');
-
-  async function refresh() {
+  const refresh = useCallback(async () => {
     if (!token) return;
+    setLoading(true);
     try {
       const [s, r, l] = await Promise.all([
         apiFetch<Stock[]>('/stocks', { token }),
@@ -49,134 +97,170 @@ export default function StocksPage() {
       setStocks(s);
       setReagents(r);
       setLabs(l);
-      setErr(null);
     } catch (e: any) {
-      setErr(e.message);
+      toast.error(e.message ?? '加载失败');
+    } finally {
+      setLoading(false);
     }
-  }
+  }, [token]);
 
   useEffect(() => {
     refresh();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, [refresh]);
 
-  async function onInbound(e: React.FormEvent) {
-    e.preventDefault();
-    try {
-      await apiFetch('/stocks', {
-        method: 'POST',
-        token,
-        body: {
-          reagentId,
-          labId,
-          batchNo: batchNo || undefined,
-          initialQty: qty,
-          currentQty: qty,
-          unit,
-          location: location || undefined,
-        },
-      });
-      setBatchNo('');
-      setQty('');
-      setLocation('');
-      refresh();
-    } catch (e: any) {
-      setErr(e.message);
-    }
-  }
+  const defaultValues = useMemo(
+    () => ({
+      reagentId: '',
+      labId: '',
+      batchNo: '',
+      qty: '',
+      unit: 'g',
+      location: '',
+    }),
+    [],
+  );
 
   return (
-    <section>
-      <h2 className="text-xl font-bold mb-4">库存管理</h2>
-      {err && <p className="text-red-600 mb-2">{err}</p>}
+    <div>
+      <PageHeader
+        title="库存管理"
+        subtitle="试剂在库批次"
+        actions={
+          <Button onClick={() => setFormOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" /> 入库
+          </Button>
+        }
+      />
+      <Card className="p-2">
+        <DataTable
+          columns={columns}
+          data={stocks}
+          loading={loading}
+          testId="stocks-table"
+          emptyTitle="暂无库存"
+        />
+      </Card>
 
-      <form
-        onSubmit={onInbound}
-        className="grid grid-cols-6 gap-2 mb-4 p-3 border rounded"
-      >
-        <select
-          className="border p-2 col-span-2"
-          value={reagentId}
-          onChange={(e) => setReagentId(e.target.value)}
-          required
-        >
-          <option value="">选择试剂</option>
-          {reagents.map((r) => (
-            <option key={r.id} value={r.id}>
-              {r.name}
-            </option>
-          ))}
-        </select>
-        <select
-          className="border p-2"
-          value={labId}
-          onChange={(e) => setLabId(e.target.value)}
-          required
-        >
-          <option value="">选择实验室</option>
-          {labs.map((l) => (
-            <option key={l.id} value={l.id}>
-              {l.name}
-            </option>
-          ))}
-        </select>
-        <input
-          className="border p-2"
-          placeholder="批号"
-          value={batchNo}
-          onChange={(e) => setBatchNo(e.target.value)}
-        />
-        <input
-          className="border p-2"
-          placeholder="数量"
-          value={qty}
-          onChange={(e) => setQty(e.target.value)}
-          required
-        />
-        <input
-          className="border p-2"
-          placeholder="单位 g/mL"
-          value={unit}
-          onChange={(e) => setUnit(e.target.value)}
-          required
-        />
-        <input
-          className="border p-2 col-span-5"
-          placeholder="存放位置（柜号-层号）"
-          value={location}
-          onChange={(e) => setLocation(e.target.value)}
-        />
-        <button className="bg-blue-600 text-white col-span-1">入库</button>
-      </form>
-
-      <table className="w-full border">
-        <thead>
-          <tr className="bg-gray-50">
-            <th className="p-2 text-left">试剂</th>
-            <th className="p-2 text-left">批号</th>
-            <th className="p-2 text-left">当前量</th>
-            <th className="p-2 text-left">单位</th>
-            <th className="p-2 text-left">位置</th>
-            <th className="p-2 text-left">有效期</th>
-            <th className="p-2 text-left">实验室</th>
-          </tr>
-        </thead>
-        <tbody>
-          {stocks.map((s) => (
-            <tr key={s.id} className="border-t">
-              <td className="p-2">{s.reagent.name}</td>
-              <td className="p-2">{s.batchNo ?? '-'}</td>
-              <td className="p-2">{s.currentQty}</td>
-              <td className="p-2">{s.unit}</td>
-              <td className="p-2">{s.location ?? '-'}</td>
-              <td className="p-2">
-                {s.expireDate ? s.expireDate.slice(0, 10) : '-'}
-              </td>
-              <td className="p-2">{s.lab.name}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </section>
+      <FormDialog
+        open={formOpen}
+        onOpenChange={setFormOpen}
+        schema={schema}
+        defaultValues={defaultValues}
+        title="入库"
+        onSubmit={async (values) => {
+          try {
+            await apiFetch('/stocks', {
+              method: 'POST',
+              token,
+              body: {
+                reagentId: values.reagentId,
+                labId: values.labId,
+                batchNo: values.batchNo || undefined,
+                initialQty: values.qty,
+                currentQty: values.qty,
+                unit: values.unit,
+                location: values.location || undefined,
+              },
+            });
+            toast.success('入库成功');
+            setFormOpen(false);
+            await refresh();
+          } catch (e: any) {
+            toast.error(e.message ?? '入库失败');
+            throw e;
+          }
+        }}
+        fields={(form) => (
+          <>
+            <FormField
+              control={form.control}
+              name="reagentId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>试剂</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger><SelectValue placeholder="选择试剂" /></SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {reagents.map((r) => (
+                        <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="labId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>实验室</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger><SelectValue placeholder="选择实验室" /></SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {labs.map((l) => (
+                        <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="batchNo"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>批号</FormLabel>
+                  <FormControl><Input {...field} placeholder="可选" /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <div className="grid grid-cols-2 gap-3">
+              <FormField
+                control={form.control}
+                name="qty"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>数量</FormLabel>
+                    <FormControl><Input {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="unit"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>单位</FormLabel>
+                    <FormControl><Input {...field} placeholder="g / mL" /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            <FormField
+              control={form.control}
+              name="location"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>存放位置</FormLabel>
+                  <FormControl><Input {...field} placeholder="柜号-层号（可选）" /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </>
+        )}
+      />
+    </div>
   );
 }
