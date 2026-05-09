@@ -1,161 +1,270 @@
 'use client';
-
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { ColumnDef } from '@tanstack/react-table';
+import { MoreHorizontal, Plus } from 'lucide-react';
+import { z } from 'zod';
+import { toast } from 'sonner';
+import { PageHeader } from '@/components/data/PageHeader';
+import { DataTable } from '@/components/data/DataTable';
+import { FormDialog } from '@/components/data/FormDialog';
+import { ConfirmDialog } from '@/components/data/ConfirmDialog';
+import {
+  FormField,
+  FormItem,
+  FormLabel,
+  FormControl,
+  FormMessage,
+} from '@/components/ui/form';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { apiFetch } from '@/lib/api-client';
 import { useAuth } from '@/lib/auth-store';
 import type { LabReagentConfigSummary, ReagentSummary } from '@app/shared';
 
-interface Lab {
-  id: string;
-  name: string;
-}
+interface Lab { id: string; name: string }
+
+const schema = z.object({
+  labId: z.string().min(1, '请选择实验室'),
+  reagentId: z.string().min(1, '请选择试剂'),
+  safetyStock: z.string().min(1, '安全阈值必填'),
+  expireWarningDays: z.string().min(1, '预警天数必填'),
+});
 
 export default function AlertsConfigPage() {
   const token = useAuth((s) => s.tokens?.accessToken);
   const [items, setItems] = useState<LabReagentConfigSummary[]>([]);
   const [reagents, setReagents] = useState<ReagentSummary[]>([]);
   const [labs, setLabs] = useState<Lab[]>([]);
-  const [form, setForm] = useState({
-    labId: '',
-    reagentId: '',
-    safetyStock: '',
-    expireWarningDays: '30',
-  });
-  const [err, setErr] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [formOpen, setFormOpen] = useState(false);
+  const [deleting, setDeleting] = useState<LabReagentConfigSummary | null>(null);
 
-  async function refresh() {
+  const refresh = useCallback(async () => {
     if (!token) return;
+    setLoading(true);
     try {
-      const data = await apiFetch<LabReagentConfigSummary[]>(
-        '/lab-reagent-configs',
-        { token },
-      );
-      setItems(data);
+      const [list, rs, ls] = await Promise.all([
+        apiFetch<LabReagentConfigSummary[]>('/lab-reagent-configs', { token }),
+        apiFetch<ReagentSummary[]>('/reagents', { token }).catch(() => [] as ReagentSummary[]),
+        apiFetch<Lab[]>('/labs', { token }).catch(() => [] as Lab[]),
+      ]);
+      setItems(list);
+      setReagents(rs);
+      setLabs(ls);
     } catch (e: any) {
-      setErr(e.message);
+      toast.error(e.message ?? '加载失败');
+    } finally {
+      setLoading(false);
     }
-  }
+  }, [token]);
 
   useEffect(() => {
     refresh();
-    if (token) {
-      apiFetch<ReagentSummary[]>('/reagents', { token }).then(setReagents).catch(() => {});
-      apiFetch<Lab[]>('/labs', { token }).then(setLabs).catch(() => {});
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, [refresh]);
 
-  async function save() {
-    try {
-      await apiFetch('/lab-reagent-configs', {
-        method: 'POST',
-        token,
-        body: {
-          ...form,
-          expireWarningDays: Number(form.expireWarningDays) || 30,
-        },
-      });
-      setErr(null);
-      await refresh();
-    } catch (e: any) {
-      setErr(e.message ?? 'save failed');
-    }
-  }
+  const columns: ColumnDef<LabReagentConfigSummary>[] = useMemo(
+    () => [
+      {
+        id: 'lab',
+        header: '实验室',
+        cell: ({ row }) =>
+          labs.find((l) => l.id === row.original.labId)?.name ?? row.original.labId,
+      },
+      {
+        id: 'reagent',
+        header: '试剂',
+        cell: ({ row }) =>
+          reagents.find((r) => r.id === row.original.reagentId)?.name ??
+          row.original.reagentId,
+      },
+      { accessorKey: 'safetyStock', header: '安全阈值' },
+      { accessorKey: 'expireWarningDays', header: '预警天数' },
+      {
+        id: 'actions',
+        header: '',
+        cell: ({ row }) => (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="操作">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                className="text-destructive"
+                onClick={() => setDeleting(row.original)}
+              >
+                删除
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ),
+      },
+    ],
+    [labs, reagents],
+  );
 
-  async function remove(id: string) {
-    if (!confirm('删除该配置？')) return;
-    try {
-      await apiFetch(`/lab-reagent-configs/${id}`, {
-        method: 'DELETE',
-        token,
-      });
-      await refresh();
-    } catch (e: any) {
-      setErr(e.message);
-    }
-  }
+  const defaultValues = useMemo(
+    () => ({
+      labId: '',
+      reagentId: '',
+      safetyStock: '',
+      expireWarningDays: '30',
+    }),
+    [],
+  );
 
   return (
     <div>
-      <h1 className="text-xl font-bold mb-3">预警阈值配置</h1>
-      <div className="border p-3 rounded mb-4 space-y-2 bg-gray-50">
-        <div className="flex gap-2 flex-wrap">
-          <select
-            className="border px-2 py-1"
-            value={form.labId}
-            onChange={(e) => setForm({ ...form, labId: e.target.value })}
-          >
-            <option value="">选择实验室</option>
-            {labs.map((l) => (
-              <option key={l.id} value={l.id}>
-                {l.name}
-              </option>
-            ))}
-          </select>
-          <select
-            className="border px-2 py-1"
-            value={form.reagentId}
-            onChange={(e) => setForm({ ...form, reagentId: e.target.value })}
-          >
-            <option value="">选择试剂</option>
-            {reagents.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.name}
-              </option>
-            ))}
-          </select>
-          <input
-            className="border px-2 py-1"
-            placeholder="安全阈值"
-            value={form.safetyStock}
-            onChange={(e) => setForm({ ...form, safetyStock: e.target.value })}
-          />
-          <input
-            className="border px-2 py-1 w-24"
-            placeholder="预警天数"
-            value={form.expireWarningDays}
-            onChange={(e) =>
-              setForm({ ...form, expireWarningDays: e.target.value })
-            }
-          />
-          <button
-            className="bg-blue-600 text-white px-3 py-1 rounded"
-            onClick={save}
-          >
-            新增 / 更新
-          </button>
-        </div>
-        {err && <div className="text-red-600 text-sm">{err}</div>}
-      </div>
-      <table className="w-full border">
-        <thead className="bg-gray-100">
-          <tr>
-            <th className="border px-2">lab</th>
-            <th className="border px-2">试剂</th>
-            <th className="border px-2">阈值</th>
-            <th className="border px-2">预警天数</th>
-            <th className="border px-2">操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((c) => (
-            <tr key={c.id} className="border-t">
-              <td className="border px-2">{c.labId}</td>
-              <td className="border px-2">{c.reagentId}</td>
-              <td className="border px-2">{c.safetyStock}</td>
-              <td className="border px-2">{c.expireWarningDays}</td>
-              <td className="border px-2">
-                <button
-                  className="text-red-600 underline"
-                  onClick={() => remove(c.id)}
-                >
-                  删除
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <PageHeader
+        title="预警配置"
+        subtitle="按 实验室 + 试剂 设置安全阈值与有效期预警"
+        actions={
+          <Button onClick={() => setFormOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" /> 新增 / 更新
+          </Button>
+        }
+      />
+      <Card className="p-2">
+        <DataTable
+          columns={columns}
+          data={items}
+          loading={loading}
+          testId="alerts-config-table"
+          emptyTitle="暂无配置"
+        />
+      </Card>
+
+      <FormDialog
+        open={formOpen}
+        onOpenChange={setFormOpen}
+        schema={schema}
+        defaultValues={defaultValues}
+        title="新增 / 更新预警配置"
+        description="同 lab + reagent 已存在时为更新"
+        onSubmit={async (values) => {
+          try {
+            await apiFetch('/lab-reagent-configs', {
+              method: 'POST',
+              token,
+              body: {
+                ...values,
+                expireWarningDays: Number(values.expireWarningDays) || 30,
+              },
+            });
+            toast.success('已保存');
+            setFormOpen(false);
+            await refresh();
+          } catch (e: any) {
+            toast.error(e.message ?? '保存失败');
+            throw e;
+          }
+        }}
+        fields={(form) => (
+          <>
+            <FormField
+              control={form.control}
+              name="labId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>实验室</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger><SelectValue placeholder="选择实验室" /></SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {labs.map((l) => (
+                        <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="reagentId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>试剂</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger><SelectValue placeholder="选择试剂" /></SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {reagents.map((r) => (
+                        <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <div className="grid grid-cols-2 gap-3">
+              <FormField
+                control={form.control}
+                name="safetyStock"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>安全阈值</FormLabel>
+                    <FormControl><Input {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="expireWarningDays"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>预警天数</FormLabel>
+                    <FormControl><Input {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </>
+        )}
+      />
+
+      <ConfirmDialog
+        open={!!deleting}
+        onOpenChange={(o) => !o && setDeleting(null)}
+        title="删除预警配置"
+        description={`确认删除该配置？`}
+        onConfirm={async () => {
+          if (!deleting) return;
+          try {
+            await apiFetch(`/lab-reagent-configs/${deleting.id}`, {
+              method: 'DELETE',
+              token,
+            });
+            toast.success('已删除');
+            setDeleting(null);
+            await refresh();
+          } catch (e: any) {
+            toast.error(e.message ?? '删除失败');
+            throw e;
+          }
+        }}
+      />
     </div>
   );
 }
