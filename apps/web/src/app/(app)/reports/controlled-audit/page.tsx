@@ -1,18 +1,61 @@
 'use client';
 import { useState } from 'react';
+import type { ColumnDef } from '@tanstack/react-table';
+import { PageHeader } from '@/components/data/PageHeader';
+import { Toolbar } from '@/components/data/Toolbar';
+import { DataTable } from '@/components/data/DataTable';
 import { KpiCard } from '@/components/reports/KpiCard';
 import {
-  DateRangePicker,
+  RangePresetPicker,
   type RangePreset,
-} from '@/components/reports/DateRangePicker';
+} from '@/components/reports/RangePresetPicker';
 import { ExportButton } from '@/components/reports/ExportButton';
 import { useReportData } from '@/components/reports/useReportData';
+import { Card } from '@/components/ui/card';
 import type { ControlledAuditResponse } from '@app/shared';
+
+type Row = ControlledAuditResponse['rows'][number];
+
+const detailColumns: ColumnDef<Row>[] = [
+  {
+    accessorKey: 'ts',
+    header: '时间',
+    cell: ({ row }) => (
+      <span className="font-mono text-xs">
+        {row.original.ts.slice(0, 19).replace('T', ' ')}
+      </span>
+    ),
+  },
+  { accessorKey: 'action', header: '动作' },
+  { accessorKey: 'reagentName', header: '试剂' },
+  { accessorKey: 'actorName', header: '操作人' },
+  {
+    accessorKey: 'qty',
+    header: '数量',
+    cell: ({ row }) => (
+      <span className="tabular-nums">{row.original.qty}</span>
+    ),
+  },
+  {
+    accessorKey: 'beforeQty',
+    header: '变更前',
+    cell: ({ row }) => (
+      <span className="tabular-nums">{row.original.beforeQty ?? ''}</span>
+    ),
+  },
+  {
+    accessorKey: 'afterQty',
+    header: '变更后',
+    cell: ({ row }) => (
+      <span className="tabular-nums">{row.original.afterQty ?? ''}</span>
+    ),
+  },
+];
 
 export default function ControlledAuditPage() {
   const [range, setRange] = useState<RangePreset>('90d');
-  const [startDate, setStartDate] = useState<string | undefined>();
-  const [endDate, setEndDate] = useState<string | undefined>();
+  const [startDate, setStartDate] = useState<string>();
+  const [endDate, setEndDate] = useState<string>();
 
   const { data, loading, error } = useReportData<ControlledAuditResponse>(
     '/reports/controlled-audit',
@@ -23,13 +66,14 @@ export default function ControlledAuditPage() {
   params.set('range', range);
   if (startDate) params.set('startDate', startDate);
   if (endDate) params.set('endDate', endDate);
+  const exportEndpoint = `/reports/controlled-audit?${params.toString()}`;
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-xl font-semibold">管控试剂审计</h2>
-        <div className="flex gap-2">
-          <DateRangePicker
+    <div data-testid="reports-controlled-audit-page">
+      <PageHeader title="管控试剂审计" subtitle="管控试剂操作流水" />
+      <Toolbar
+        filters={
+          <RangePresetPicker
             range={range}
             startDate={startDate}
             endDate={endDate}
@@ -38,54 +82,48 @@ export default function ControlledAuditPage() {
               setStartDate(n.startDate);
               setEndDate(n.endDate);
             }}
+            testId="reports-controlled-audit-range"
           />
+        }
+        actions={
           <ExportButton
-            endpoint={`/reports/controlled-audit?${params.toString()}`}
+            endpoint={exportEndpoint}
+            testId="reports-controlled-audit-export"
           />
-        </div>
-      </div>
+        }
+      />
 
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-        <KpiCard label="审计事件数" value={data?.summary.totalEvents ?? '—'} />
+      <div
+        className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2"
+        data-testid="reports-controlled-audit-kpis"
+      >
+        <KpiCard
+          label="审计事件数"
+          value={data?.summary.totalEvents}
+          loading={loading}
+          testId="reports-controlled-audit-kpi-events"
+        />
         <KpiCard
           label="操作人数"
-          value={data?.summary.distinctActors ?? '—'}
+          value={data?.summary.distinctActors}
+          loading={loading}
+          testId="reports-controlled-audit-kpi-actors"
         />
       </div>
 
-      <div className="rounded border border-gray-200 bg-white p-4 shadow-sm">
-        <h3 className="mb-3 text-base font-medium">审计明细(时间倒序)</h3>
-        {loading && <div className="py-8 text-center text-gray-400">加载中…</div>}
-        {error && <div className="py-8 text-center text-red-600">加载失败:{error}</div>}
-        {!loading && !error && (
-          <table className="w-full text-sm">
-            <thead className="text-left text-gray-500">
-              <tr>
-                <th className="py-1">时间</th>
-                <th className="py-1">动作</th>
-                <th className="py-1">试剂</th>
-                <th className="py-1">操作人</th>
-                <th className="py-1">数量</th>
-                <th className="py-1">变更前</th>
-                <th className="py-1">变更后</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(data?.rows ?? []).map((r, i) => (
-                <tr key={i} className="border-t">
-                  <td className="py-1">{r.ts.slice(0, 19).replace('T', ' ')}</td>
-                  <td className="py-1">{r.action}</td>
-                  <td className="py-1">{r.reagentName}</td>
-                  <td className="py-1">{r.actorName}</td>
-                  <td className="py-1">{r.qty}</td>
-                  <td className="py-1">{r.beforeQty ?? ''}</td>
-                  <td className="py-1">{r.afterQty ?? ''}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+      <Card className="p-2">
+        <DataTable
+          columns={detailColumns}
+          data={data?.rows ?? []}
+          loading={loading}
+          testId="reports-controlled-audit-detail-table"
+          emptyTitle="暂无审计记录"
+        />
+      </Card>
+
+      {error && !loading && (
+        <p className="mt-4 text-sm text-destructive">加载失败:{error}</p>
+      )}
     </div>
   );
 }
