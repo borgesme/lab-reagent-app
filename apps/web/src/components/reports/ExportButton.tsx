@@ -9,7 +9,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { apiBaseUrl } from '@/lib/api-client';
+import { apiFetchRaw } from '@/lib/api-client';
 import { useAuth } from '@/lib/auth-store';
 
 export interface ExportButtonProps {
@@ -26,8 +26,8 @@ export function ExportButton({ endpoint, testId }: ExportButtonProps) {
     setDownloading(true);
     try {
       const sep = endpoint.includes('?') ? '&' : '?';
-      const res = await fetch(`${apiBaseUrl}${endpoint}${sep}format=${format}`, {
-        headers: { Authorization: `Bearer ${tokens.accessToken}` },
+      const res = await apiFetchRaw(`${endpoint}${sep}format=${format}`, {
+        token: tokens.accessToken,
       });
       if (!res.ok) {
         toast.error(`导出失败:HTTP ${res.status}`);

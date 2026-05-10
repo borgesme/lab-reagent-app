@@ -30,14 +30,22 @@ async function tryRefresh(): Promise<string | null> {
   return refreshInflight;
 }
 
-export async function apiFetch<T = any>(
+export interface ApiFetchOpts {
+  method?: string;
+  body?: any;
+  token?: string;
+  headers?: Record<string, string>;
+}
+
+export async function apiFetchRaw(
   path: string,
-  opts: { method?: string; body?: any; token?: string } = {},
-): Promise<T> {
+  opts: ApiFetchOpts = {},
+): Promise<Response> {
   const doFetch = (token?: string) => {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-    };
+    const headers: Record<string, string> = { ...(opts.headers ?? {}) };
+    if (opts.body && !headers['Content-Type']) {
+      headers['Content-Type'] = 'application/json';
+    }
     if (token) headers['Authorization'] = `Bearer ${token}`;
     return fetch(`${apiBaseUrl}${path}`, {
       method: opts.method ?? 'GET',
@@ -56,6 +64,14 @@ export async function apiFetch<T = any>(
       if (typeof window !== 'undefined') window.location.href = '/login';
     }
   }
+  return res;
+}
+
+export async function apiFetch<T = any>(
+  path: string,
+  opts: ApiFetchOpts = {},
+): Promise<T> {
+  const res = await apiFetchRaw(path, opts);
   if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`);
   return res.status === 204 ? (undefined as T) : res.json();
 }
