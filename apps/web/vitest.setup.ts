@@ -14,3 +14,16 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
 if (typeof window !== 'undefined' && !window.HTMLElement.prototype.scrollIntoView) {
   window.HTMLElement.prototype.scrollIntoView = function () {};
 }
+
+// Radix Select / Popover 在 jsdom 需要 pointer capture API
+if (typeof window !== 'undefined' && !window.HTMLElement.prototype.hasPointerCapture) {
+  window.HTMLElement.prototype.hasPointerCapture = function () {
+    return false;
+  };
+}
+if (typeof window !== 'undefined' && !window.HTMLElement.prototype.releasePointerCapture) {
+  window.HTMLElement.prototype.releasePointerCapture = function () {};
+}
+if (typeof window !== 'undefined' && !window.HTMLElement.prototype.setPointerCapture) {
+  window.HTMLElement.prototype.setPointerCapture = function () {};
+}
