@@ -12,38 +12,44 @@ test.describe('Path 5: SYS_ADMIN visits 4 reports', () => {
   test.use({ storageState: stateFor('admin') });
 
   for (const [slug, label] of SLUGS) {
-    test(`${slug} renders heading + KPI`, async ({ page }) => {
+    test(`${slug} renders page + KPI`, async ({ page }) => {
       await page.goto(`/reports/${slug}`);
-      // exact match: 采购金额 page also has h3 "采购金额(按月)"
+      // page wrapper testid 表示路由+权限通过
+      await expect(page.getByTestId(`reports-${slug}-page`)).toBeVisible();
+      // PageHeader 渲染的标题文字（用户可见）
       await expect(
-        page.getByRole('heading', { name: label, exact: true }),
+        page.getByRole('heading', { name: label }),
       ).toBeVisible();
 
-      // KpiCard renders value as div.text-3xl. Empty data shows '—'.
-      const firstKpi = page.locator('div.text-3xl').first();
+      // 第一个 KPI value：等 loading 完成（Skeleton 撤掉后 value span 才出现）
+      const firstKpi = page
+        .locator(`[data-testid^="reports-${slug}-kpi-"][data-testid$="-value"]`)
+        .first();
       await expect(firstKpi).toBeVisible({ timeout: 10_000 });
       await expect(firstKpi).toHaveText(/[0-9—.\-]+/);
 
-      if (slug === 'controlled-audit') {
+      if (slug === 'controlled-audit' || slug === 'inventory-turnover') {
         await expect(
-          page.getByRole('columnheader', { name: '时间' }),
+          page.getByTestId(`reports-${slug}-detail-table`),
         ).toBeVisible();
       }
-      // svg chart is best-effort: recharts skips render on empty series, and
-      // dev-mode dynamic import + no seed data leaves the chart slot empty.
-      // KPI presence is the real signal that data fetch + scope gate worked.
     });
   }
 
   test('export CSV triggers a .csv download', async ({ page }) => {
     await page.goto('/reports/usage-trend');
+    // 等 KPI 出来确保数据已加载
+    await expect(
+      page
+        .locator('[data-testid^="reports-usage-trend-kpi-"][data-testid$="-value"]')
+        .first(),
+    ).toBeVisible({ timeout: 10_000 });
+
+    await page.getByTestId('reports-usage-trend-export').click();
     const [download] = await Promise.all([
       page.waitForEvent('download'),
-      page.getByRole('button', { name: '导出 CSV' }).click(),
+      page.getByTestId('reports-usage-trend-export-csv').click(),
     ]);
-    // Backend sets Content-Disposition with the slug name, but CORS doesn't
-    // expose that header to fetch() in dev (Access-Control-Expose-Headers),
-    // so ExportButton falls back to "report.csv". Just assert .csv suffix.
     expect(download.suggestedFilename()).toMatch(/\.csv$/);
   });
 });
