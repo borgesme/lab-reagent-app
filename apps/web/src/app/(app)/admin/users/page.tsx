@@ -26,6 +26,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Combobox } from '@/components/ui/combobox';
 import { apiFetch } from '@/lib/api-client';
 import { useAuth } from '@/lib/auth-store';
 
@@ -36,6 +37,11 @@ interface UserRow {
   lab?: { id?: string; name: string } | null;
   labId?: string | null;
   roles?: Array<{ role: { code: string } }>;
+}
+
+interface LabRow {
+  id: string;
+  name: string;
 }
 
 const ALL_ROLES = [
@@ -59,6 +65,7 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<UserRow | null>(null);
   const [resetting, setResetting] = useState<UserRow | null>(null);
+  const [labs, setLabs] = useState<LabRow[]>([]);
 
   const refresh = useCallback(async () => {
     if (!token) return;
@@ -76,6 +83,23 @@ export default function UsersPage() {
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    if (!token) return;
+    apiFetch<LabRow[]>('/labs', { token })
+      .then(setLabs)
+      .catch(() => {
+        // 静默失败,只是少了下拉选项
+      });
+  }, [token]);
+
+  const labOptions = useMemo(
+    () => [
+      { value: '', label: '无实验室' },
+      ...labs.map((l) => ({ value: l.id, label: l.name })),
+    ],
+    [labs],
+  );
 
   const editingDefaults: UpdateValues = useMemo(
     () => ({
@@ -211,11 +235,16 @@ export default function UsersPage() {
               name="labId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>实验室 ID（留空表示无）</FormLabel>
+                  <FormLabel>实验室</FormLabel>
                   <FormControl>
-                    <Input
-                      data-testid="admin-users-edit-lab"
-                      {...field}
+                    <Combobox
+                      options={labOptions}
+                      value={field.value ?? ''}
+                      onChange={field.onChange}
+                      placeholder="选择实验室"
+                      searchPlaceholder="搜索实验室..."
+                      emptyText="无匹配实验室"
+                      testId="admin-users-edit-lab"
                     />
                   </FormControl>
                   <FormMessage />
