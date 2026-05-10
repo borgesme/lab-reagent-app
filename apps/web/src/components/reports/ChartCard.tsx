@@ -1,26 +1,48 @@
 'use client';
 import type { ReactNode } from 'react';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
+import { ErrorState } from '@/components/data/ErrorState';
+import { EmptyState } from '@/components/data/EmptyState';
 
-interface Props {
+export interface ChartCardProps {
   title: string;
   loading?: boolean;
   error?: string | null;
   empty?: boolean;
+  testId?: string;
   children: ReactNode;
 }
 
-export function ChartCard({ title, loading, error, empty, children }: Props) {
+export function ChartCard({
+  title,
+  loading,
+  error,
+  empty,
+  testId,
+  children,
+}: ChartCardProps) {
   return (
-    <div className="rounded border border-gray-200 bg-white p-4 shadow-sm">
-      <h3 className="mb-3 text-base font-medium">{title}</h3>
-      {loading && <div className="py-12 text-center text-gray-400">加载中…</div>}
-      {!loading && error && (
-        <div className="py-12 text-center text-red-600">加载失败:{error}</div>
-      )}
-      {!loading && !error && empty && (
-        <div className="py-12 text-center text-gray-400">暂无数据</div>
-      )}
-      {!loading && !error && !empty && children}
-    </div>
+    <Card data-testid={testId}>
+      <CardHeader>
+        <CardTitle className="text-base">{title}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <Skeleton className="h-[320px] w-full" />
+        ) : error ? (
+          <ErrorState message={error} />
+        ) : empty ? (
+          <EmptyState title="暂无数据" />
+        ) : (
+          children
+        )}
+      </CardContent>
+    </Card>
   );
 }
