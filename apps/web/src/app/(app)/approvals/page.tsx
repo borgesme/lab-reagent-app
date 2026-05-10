@@ -63,7 +63,7 @@ export default function ApprovalsPage() {
   }
 
   return (
-    <div>
+    <div data-testid="approvals-page">
       <PageHeader title="待我审批" subtitle="待处理的试剂申请" />
       <main>
         {items.length === 0 && !loading ? (
@@ -73,7 +73,7 @@ export default function ApprovalsPage() {
             {items.map((r) => {
               const ctrl = r.reagent.hazardLevel === 'CONTROLLED' || !!r.reagent.controlType;
               return (
-                <li key={r.id} data-testid="approval-row">
+                <li key={r.id} data-testid={`approvals-item-${r.id}`}>
                   <Card className="p-4">
                     <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                       <div className="space-y-1">
@@ -107,16 +107,18 @@ export default function ApprovalsPage() {
                           onChange={(e) =>
                             setCommentById((m) => ({ ...m, [r.id]: e.target.value }))
                           }
+                          data-testid={`approvals-comment-${r.id}`}
                         />
                         <div className="flex flex-wrap justify-end gap-2">
                           <Button
-                            data-testid="approval-approve-l1"
+                            data-testid={`approvals-tier1-approve-${r.id}`}
                             size="sm"
                             onClick={() => decide(r.id, 'APPROVE', 1)}
                           >
                             一审通过
                           </Button>
                           <Button
+                            data-testid={`approvals-tier1-reject-${r.id}`}
                             size="sm"
                             variant="destructive"
                             onClick={() => decide(r.id, 'REJECT', 1)}
@@ -125,10 +127,15 @@ export default function ApprovalsPage() {
                           </Button>
                           {ctrl && (
                             <>
-                              <Button size="sm" onClick={() => decide(r.id, 'APPROVE', 2)}>
+                              <Button
+                                data-testid={`approvals-tier2-approve-${r.id}`}
+                                size="sm"
+                                onClick={() => decide(r.id, 'APPROVE', 2)}
+                              >
                                 二审通过
                               </Button>
                               <Button
+                                data-testid={`approvals-tier2-reject-${r.id}`}
                                 size="sm"
                                 variant="destructive"
                                 onClick={() => decide(r.id, 'REJECT', 2)}

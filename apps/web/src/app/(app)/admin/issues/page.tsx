@@ -117,18 +117,18 @@ export default function IssuesPage() {
   }
 
   return (
-    <div>
+    <div data-testid="admin-issues-page">
       <PageHeader title="发放管理" subtitle="待发放申请与已发放台账" />
 
       <h2 className="mb-3 text-base font-semibold">待发放</h2>
       {pending.length === 0 ? (
         <EmptyState title="暂无待发放申请" />
       ) : (
-        <ul className="mb-6 space-y-3" data-testid="issues-pending">
+        <ul className="mb-6 space-y-3" data-testid="admin-issues-pending">
           {pending.map((r) => {
             const ctrl = isCtrl(r);
             return (
-              <li key={r.id}>
+              <li key={r.id} data-testid={`admin-issues-row-${r.id}`}>
                 <Card className="p-4">
                   <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                     <div className="space-y-1">
@@ -152,9 +152,16 @@ export default function IssuesPage() {
                         onChange={(e) =>
                           setQtyById((m) => ({ ...m, [r.id]: e.target.value }))
                         }
+                        data-testid={`admin-issues-row-${r.id}-qty`}
                       />
                       {!ctrl && (
-                        <Button size="sm" onClick={() => issue(r)}>发放</Button>
+                        <Button
+                          size="sm"
+                          onClick={() => issue(r)}
+                          data-testid={`admin-issues-row-${r.id}-issue`}
+                        >
+                          发放
+                        </Button>
                       )}
                     </div>
                   </div>
@@ -205,7 +212,13 @@ export default function IssuesPage() {
                           </Button>
                         </div>
                         <div className="flex justify-end">
-                          <Button size="sm" onClick={() => issue(r)}>发放</Button>
+                          <Button
+                            size="sm"
+                            onClick={() => issue(r)}
+                            data-testid={`admin-issues-row-${r.id}-issue`}
+                          >
+                            发放
+                          </Button>
                         </div>
                       </div>
                     </>
@@ -223,7 +236,7 @@ export default function IssuesPage() {
           columns={issuedColumns}
           data={issued}
           loading={loading}
-          testId="issues-issued"
+          testId="admin-issues-history-table"
           emptyTitle="暂无已发放记录"
         />
       </Card>

@@ -239,12 +239,15 @@ export default function MyRequestsPage() {
   );
 
   return (
-    <div>
+    <div data-testid="my-requests-page">
       <PageHeader
         title="我的申请"
         subtitle="试剂领用申请记录"
         actions={
-          <Button onClick={() => setFormOpen(true)}>
+          <Button
+            onClick={() => setFormOpen(true)}
+            data-testid="my-requests-add"
+          >
             <Plus className="mr-2 h-4 w-4" /> 新申请
           </Button>
         }
@@ -266,6 +269,7 @@ export default function MyRequestsPage() {
         defaultValues={defaultValues}
         title="新建领用申请"
         description="管控试剂用途需 ≥50 字，项目号、使用地点必填"
+        testId="my-requests-form"
         onSubmit={async (values) => {
           try {
             await apiFetch('/requests', {
@@ -310,15 +314,22 @@ export default function MyRequestsPage() {
                       value={field.value}
                     >
                       <FormControl>
-                        <SelectTrigger><SelectValue placeholder="选择试剂" /></SelectTrigger>
+                        <SelectTrigger data-testid="my-requests-form-reagent"><SelectValue placeholder="选择试剂" /></SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {reagents.map((r) => (
-                          <SelectItem key={r.id} value={r.id}>
-                            {r.name}
-                            {(r.hazardLevel === 'CONTROLLED' || r.controlType) ? '（管控）' : ''}
-                          </SelectItem>
-                        ))}
+                        {reagents.map((r) => {
+                          const ctrl = r.hazardLevel === 'CONTROLLED' || !!r.controlType;
+                          return (
+                            <SelectItem
+                              key={r.id}
+                              value={r.id}
+                              data-controlled={ctrl ? 'true' : 'false'}
+                            >
+                              {r.name}
+                              {ctrl ? '（管控）' : ''}
+                            </SelectItem>
+                          );
+                        })}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -333,7 +344,7 @@ export default function MyRequestsPage() {
                     <FormLabel>批次</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
-                        <SelectTrigger><SelectValue placeholder="选择批次" /></SelectTrigger>
+                        <SelectTrigger data-testid="my-requests-form-stock"><SelectValue placeholder="选择批次" /></SelectTrigger>
                       </FormControl>
                       <SelectContent>
                         {stocksForReagent.map((s) => (
@@ -354,7 +365,7 @@ export default function MyRequestsPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>数量</FormLabel>
-                      <FormControl><Input {...field} /></FormControl>
+                      <FormControl><Input data-testid="my-requests-form-qty" {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -377,7 +388,7 @@ export default function MyRequestsPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>用途</FormLabel>
-                    <FormControl><Textarea rows={3} {...field} /></FormControl>
+                    <FormControl><Textarea rows={3} data-testid="my-requests-form-purpose" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -389,7 +400,7 @@ export default function MyRequestsPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>项目号</FormLabel>
-                      <FormControl><Input {...field} /></FormControl>
+                      <FormControl><Input data-testid="my-requests-form-project" {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -400,7 +411,7 @@ export default function MyRequestsPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>使用地点</FormLabel>
-                      <FormControl><Input {...field} /></FormControl>
+                      <FormControl><Input data-testid="my-requests-form-location" {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -417,6 +428,7 @@ export default function MyRequestsPage() {
         title="取消申请"
         description={`确认取消"${cancelling?.reagent.name}"的申请？`}
         confirmLabel="确认取消"
+        testId="my-requests-cancel"
         onConfirm={async () => {
           if (!cancelling) return;
           try {

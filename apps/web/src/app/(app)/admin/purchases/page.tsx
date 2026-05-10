@@ -197,12 +197,16 @@ export default function AdminPurchasesPage() {
   );
 
   return (
-    <div>
+    <div data-testid="admin-purchases-page">
       <PageHeader
         title="采购管理"
         subtitle="待合并申请与批次入库"
         actions={
-          <Button disabled={picked.size === 0} onClick={merge}>
+          <Button
+            disabled={picked.size === 0}
+            onClick={merge}
+            data-testid="admin-purchases-merge"
+          >
             合并成批次（{picked.size}）
           </Button>
         }
