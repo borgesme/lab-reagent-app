@@ -43,6 +43,7 @@ model User {
   lab             Lab?          @relation(fields: [labId], references: [id])
   roles           UserRole[]
   wechatOpenId    String?       @unique
+  currentRefreshJti String?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
   deletedAt       DateTime?

@@ -67,4 +67,30 @@ describe('Auth', () => {
     const me = await request(app.getHttpServer()).get('/auth/me');
     expect(me.status).toBe(401);
   });
+
+  it('refresh token rotation: 旧 refresh 用一次后再用应 401', async () => {
+    const login = await request(app.getHttpServer())
+      .post('/auth/login')
+      .send({ email: 'admin@lab.local', password: 'admin123' });
+    const oldRefresh = login.body.refreshToken;
+
+    // 第一次 refresh:成功,得新对
+    const r1 = await request(app.getHttpServer())
+      .post('/auth/refresh')
+      .send({ refreshToken: oldRefresh });
+    expect(r1.status).toBe(200);
+    expect(r1.body.refreshToken).not.toBe(oldRefresh);
+
+    // 同一旧 refresh 再用一次:应 401
+    const r2 = await request(app.getHttpServer())
+      .post('/auth/refresh')
+      .send({ refreshToken: oldRefresh });
+    expect(r2.status).toBe(401);
+
+    // 新 refresh 仍可用一次
+    const r3 = await request(app.getHttpServer())
+      .post('/auth/refresh')
+      .send({ refreshToken: r1.body.refreshToken });
+    expect(r3.status).toBe(200);
+  });
 });

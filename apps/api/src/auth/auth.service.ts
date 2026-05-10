@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { randomUUID } from 'crypto';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service';
 import { RegisterDto } from './dto/register.dto';
@@ -67,6 +68,13 @@ export class AuthService {
       const payload = await this.jwt.verifyAsync(token, {
         secret: this.cfg.getOrThrow('JWT_REFRESH_SECRET'),
       });
+      const user = await this.prisma.user.findUnique({
+        where: { id: payload.sub },
+      });
+      if (!user || user.deletedAt) throw new UnauthorizedException();
+      if (!payload.jti || user.currentRefreshJti !== payload.jti) {
+        throw new UnauthorizedException();
+      }
       return this.issueTokens(payload.sub, payload.roles);
     } catch {
       throw new UnauthorizedException();
@@ -81,13 +89,18 @@ export class AuthService {
         expiresIn: this.cfg.get('JWT_ACCESS_TTL') ?? '15m',
       },
     );
+    const jti = randomUUID();
     const refreshToken = await this.jwt.signAsync(
-      { sub, roles },
+      { sub, roles, jti },
       {
         secret: this.cfg.getOrThrow('JWT_REFRESH_SECRET'),
         expiresIn: this.cfg.get('JWT_REFRESH_TTL') ?? '7d',
       },
     );
+    await this.prisma.user.update({
+      where: { id: sub },
+      data: { currentRefreshJti: jti },
+    });
     return { accessToken, refreshToken };
   }
 }
