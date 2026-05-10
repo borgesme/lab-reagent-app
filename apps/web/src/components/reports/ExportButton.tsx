@@ -36,10 +36,13 @@ export function ExportButton({ endpoint, testId }: ExportButtonProps) {
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
+      const pathOnly = endpoint.split('?')[0];
+      const slug = pathOnly.split('/').filter(Boolean).pop() ?? 'report';
+      const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
       a.href = url;
       a.download =
         res.headers.get('Content-Disposition')?.match(/filename="([^"]+)"/)?.[1] ??
-        `report.${format}`;
+        `${slug}-${today}.${format}`;
       a.click();
       URL.revokeObjectURL(url);
     } catch (e: any) {

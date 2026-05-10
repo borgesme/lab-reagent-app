@@ -65,4 +65,31 @@ describe('ExportButton', () => {
       expect(toast.error).toHaveBeenCalledWith('导出失败:HTTP 500'),
     );
   });
+
+  it('fallback 文件名使用 endpoint slug + 当天日期', async () => {
+    (global as any).fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      blob: async () => new Blob(['csv']),
+      headers: { get: () => null },
+    });
+    const anchorEl = {
+      click: vi.fn(),
+      href: '',
+      download: '',
+    } as unknown as HTMLAnchorElement;
+    const realCreate = document.createElement.bind(document);
+    vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
+      if (tag === 'a') return anchorEl;
+      return realCreate(tag);
+    });
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    render(<ExportButton endpoint="/reports/usage-trend?range=30d" testId="ex" />);
+    await user.click(screen.getByTestId('ex'));
+    await user.click(await screen.findByTestId('ex-csv'));
+
+    await waitFor(() => {
+      expect(anchorEl.download).toMatch(/^usage-trend-\d{8}\.csv$/);
+    });
+  });
 });
