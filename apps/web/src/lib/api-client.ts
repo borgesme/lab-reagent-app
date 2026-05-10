@@ -36,12 +36,25 @@ export interface ApiFetchOpts {
   body?: any;
   token?: string;
   headers?: Record<string, string>;
+  signal?: AbortSignal;
+  /** 默认 30000ms。传 0 禁用 timeout。 */
+  timeoutMs?: number;
 }
 
 export async function apiFetchRaw(
   path: string,
   opts: ApiFetchOpts = {},
 ): Promise<Response> {
+  const buildSignal = (): AbortSignal | undefined => {
+    const timeoutMs = opts.timeoutMs ?? 30_000;
+    const signals: AbortSignal[] = [];
+    if (opts.signal) signals.push(opts.signal);
+    if (timeoutMs > 0) signals.push(AbortSignal.timeout(timeoutMs));
+    if (signals.length === 0) return undefined;
+    if (signals.length === 1) return signals[0];
+    return (AbortSignal as any).any(signals);
+  };
+
   const doFetch = (token?: string) => {
     const headers: Record<string, string> = { ...(opts.headers ?? {}) };
     if (opts.body && !headers['Content-Type']) {
@@ -52,6 +65,7 @@ export async function apiFetchRaw(
       method: opts.method ?? 'GET',
       headers,
       body: opts.body ? JSON.stringify(opts.body) : undefined,
+      signal: buildSignal(),
     });
   };
 
