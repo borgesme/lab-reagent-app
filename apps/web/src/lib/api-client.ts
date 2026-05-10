@@ -19,6 +19,7 @@ async function tryRefresh(): Promise<string | null> {
       });
       if (!res.ok) return null;
       const data = (await res.json()) as AuthTokens;
+      if (!useAuth.getState().tokens) return null;
       useAuth.getState().setTokens(data);
       return data.accessToken;
     } catch {
