@@ -19,6 +19,7 @@ export interface ConfirmDialogProps {
   confirmLabel?: string;
   cancelLabel?: string;
   destructive?: boolean;
+  testId?: string;
   onConfirm: () => Promise<void>;
 }
 
@@ -30,6 +31,7 @@ export function ConfirmDialog({
   confirmLabel = '确认删除',
   cancelLabel = '取消',
   destructive = true,
+  testId,
   onConfirm,
 }: ConfirmDialogProps) {
   const [pending, setPending] = React.useState(false);
@@ -47,7 +49,7 @@ export function ConfirmDialog({
 
   return (
     <AlertDialog open={open} onOpenChange={(o) => !pending && onOpenChange(o)}>
-      <AlertDialogContent>
+      <AlertDialogContent data-testid={testId}>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
           <AlertDialogDescription>{description}</AlertDialogDescription>
@@ -58,6 +60,7 @@ export function ConfirmDialog({
             variant="outline"
             onClick={() => onOpenChange(false)}
             disabled={pending}
+            data-testid={testId ? testId + '-cancel' : undefined}
           >
             {cancelLabel}
           </Button>
@@ -66,6 +69,7 @@ export function ConfirmDialog({
             variant={destructive ? 'destructive' : 'default'}
             onClick={handleConfirm}
             disabled={pending}
+            data-testid={testId ? testId + '-confirm' : undefined}
           >
             {pending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {confirmLabel}

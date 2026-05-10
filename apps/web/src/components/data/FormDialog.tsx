@@ -25,6 +25,7 @@ export interface FormDialogProps<S extends ZodType<any, any, any>> {
   description?: string;
   submitLabel?: string;
   cancelLabel?: string;
+  testId?: string;
   fields: (form: UseFormReturn<z.infer<S>>) => React.ReactNode;
 }
 
@@ -38,6 +39,7 @@ export function FormDialog<S extends ZodType<any, any, any>>({
   description,
   submitLabel = '保存',
   cancelLabel = '取消',
+  testId,
   fields,
 }: FormDialogProps<S>) {
   const form = useForm<z.infer<S>>({
@@ -62,7 +64,7 @@ export function FormDialog<S extends ZodType<any, any, any>>({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md" data-testid={testId}>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           {description && <DialogDescription>{description}</DialogDescription>}
@@ -79,10 +81,15 @@ export function FormDialog<S extends ZodType<any, any, any>>({
                 variant="outline"
                 onClick={() => onOpenChange(false)}
                 disabled={form.formState.isSubmitting}
+                data-testid={testId ? testId + '-cancel' : undefined}
               >
                 {cancelLabel}
               </Button>
-              <Button type="submit" disabled={form.formState.isSubmitting}>
+              <Button
+                type="submit"
+                disabled={form.formState.isSubmitting}
+                data-testid={testId ? testId + '-submit' : undefined}
+              >
                 {form.formState.isSubmitting && (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 )}
