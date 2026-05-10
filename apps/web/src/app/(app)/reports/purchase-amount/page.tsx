@@ -1,14 +1,23 @@
 'use client';
 import { useState } from 'react';
 import dynamic from 'next/dynamic';
+import { PageHeader } from '@/components/data/PageHeader';
+import { Toolbar } from '@/components/data/Toolbar';
 import { KpiCard } from '@/components/reports/KpiCard';
 import { ChartCard } from '@/components/reports/ChartCard';
 import {
-  DateRangePicker,
+  RangePresetPicker,
   type RangePreset,
-} from '@/components/reports/DateRangePicker';
+} from '@/components/reports/RangePresetPicker';
 import { ExportButton } from '@/components/reports/ExportButton';
 import { useReportData } from '@/components/reports/useReportData';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import type { PurchaseAmountResponse } from '@app/shared';
 
 const BarChart = dynamic(
@@ -26,13 +35,13 @@ const ResponsiveContainer = dynamic(
   { ssr: false },
 );
 
+type GroupBy = 'month' | 'category' | 'supplier';
+
 export default function PurchaseAmountPage() {
   const [range, setRange] = useState<RangePreset>('365d');
-  const [startDate, setStartDate] = useState<string | undefined>();
-  const [endDate, setEndDate] = useState<string | undefined>();
-  const [groupBy, setGroupBy] = useState<'month' | 'category' | 'supplier'>(
-    'month',
-  );
+  const [startDate, setStartDate] = useState<string>();
+  const [endDate, setEndDate] = useState<string>();
+  const [groupBy, setGroupBy] = useState<GroupBy>('month');
 
   const { data, loading, error } = useReportData<PurchaseAmountResponse>(
     '/reports/purchase-amount',
@@ -44,51 +53,87 @@ export default function PurchaseAmountPage() {
   if (startDate) params.set('startDate', startDate);
   if (endDate) params.set('endDate', endDate);
   params.set('groupBy', groupBy);
+  const exportEndpoint = `/reports/purchase-amount?${params.toString()}`;
+
+  const groupByLabel: Record<GroupBy, string> = {
+    month: '按月',
+    category: '按品类',
+    supplier: '按供应商',
+  };
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-xl font-semibold">采购金额</h2>
-        <div className="flex gap-2">
-          <select
-            className="rounded border px-2 py-1"
-            value={groupBy}
-            onChange={(e) => setGroupBy(e.target.value as any)}
-          >
-            <option value="month">按月</option>
-            <option value="category">按品类</option>
-            <option value="supplier">按供应商</option>
-          </select>
-          <DateRangePicker
-            range={range}
-            startDate={startDate}
-            endDate={endDate}
-            onChange={(n) => {
-              setRange(n.range);
-              setStartDate(n.startDate);
-              setEndDate(n.endDate);
-            }}
-          />
+    <div data-testid="reports-purchase-amount-page">
+      <PageHeader title="采购金额" subtitle="批次金额按维度汇总" />
+      <Toolbar
+        filters={
+          <>
+            <Select
+              value={groupBy}
+              onValueChange={(v) => setGroupBy(v as GroupBy)}
+            >
+              <SelectTrigger
+                className="w-32"
+                data-testid="reports-purchase-amount-groupby"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="month">按月</SelectItem>
+                <SelectItem value="category">按品类</SelectItem>
+                <SelectItem value="supplier">按供应商</SelectItem>
+              </SelectContent>
+            </Select>
+            <RangePresetPicker
+              range={range}
+              startDate={startDate}
+              endDate={endDate}
+              onChange={(n) => {
+                setRange(n.range);
+                setStartDate(n.startDate);
+                setEndDate(n.endDate);
+              }}
+              testId="reports-purchase-amount-range"
+            />
+          </>
+        }
+        actions={
           <ExportButton
-            endpoint={`/reports/purchase-amount?${params.toString()}`}
+            endpoint={exportEndpoint}
+            testId="reports-purchase-amount-export"
           />
-        </div>
-      </div>
+        }
+      />
 
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        <KpiCard label="总采购金额(元)" value={data?.summary.totalAmount ?? '—'} />
-        <KpiCard label="批次数" value={data?.summary.batchCount ?? '—'} />
+      <div
+        className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-3"
+        data-testid="reports-purchase-amount-kpis"
+      >
+        <KpiCard
+          label="总采购金额(元)"
+          value={data?.summary.totalAmount}
+          loading={loading}
+          testId="reports-purchase-amount-kpi-total"
+        />
+        <KpiCard
+          label="批次数"
+          value={data?.summary.batchCount}
+          loading={loading}
+          testId="reports-purchase-amount-kpi-batch-count"
+        />
         <KpiCard
           label="待入库批次"
-          value={data?.summary.pendingBatchCount ?? '—'}
+          value={data?.summary.pendingBatchCount}
+          loading={loading}
+          testId="reports-purchase-amount-kpi-pending-batch"
         />
       </div>
 
       <ChartCard
-        title={`采购金额(${groupBy === 'month' ? '按月' : groupBy === 'category' ? '按品类' : '按供应商'})`}
+        title={`采购金额(${groupByLabel[groupBy]})`}
         loading={loading}
         error={error}
         empty={!loading && !error && (data?.series.length ?? 0) === 0}
+        testId="reports-purchase-amount-chart"
       >
         {data && (
           <ResponsiveContainer width="100%" height={320}>
@@ -96,7 +141,7 @@ export default function PurchaseAmountPage() {
               <XAxis dataKey="bucket" />
               <YAxis />
               <Tooltip />
-              <Bar dataKey="amount" fill="#52c41a" />
+              <Bar dataKey="amount" fill="hsl(var(--primary))" />
             </BarChart>
           </ResponsiveContainer>
         )}
