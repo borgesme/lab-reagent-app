@@ -305,7 +305,19 @@ export default function UsersPage() {
               `/users/${resetting.id}/reset-password`,
               { method: 'POST', token },
             );
-            toast.success(`临时密码：${res.tempPassword}`, { duration: 30_000 });
+            const tempPassword = res.tempPassword;
+            toast.success(`临时密码：${tempPassword}`, {
+              duration: 60_000,
+              action: {
+                label: '复制',
+                onClick: () => {
+                  navigator.clipboard.writeText(tempPassword).then(
+                    () => toast.success('已复制到剪贴板'),
+                    () => toast.error('复制失败'),
+                  );
+                },
+              },
+            });
             setResetting(null);
           } catch (e: any) {
             toast.error(e.message ?? '重置失败');
