@@ -4,44 +4,53 @@ import { stateFor } from './fixtures/auth';
 // Storage state is pre-warmed by tests/e2e/global-setup.ts so all spec files
 // can read .auth/<role>.json synchronously at worker init.
 
-// Path 1 lives at /my/requests (NOT /reagents). The form uses native <select>
-// for reagent + stock; submit is a <button>提交</button>. Stock options only
-// exist after admin has done a purchase + receipt; if seed has no stocks the
-// test self-skips.
+// Path 1 lives at /my/requests. Form is FormDialog with testid 'my-requests-form'.
+// Stock options only exist after admin has done a purchase + receipt; if seed
+// has no stocks the test self-skips.
 test.describe('Path 1: PLAIN_USER apply for reagent', () => {
   test.use({ storageState: stateFor('plain') });
 
   test('select reagent + stock → submit → row in PENDING', async ({ page }) => {
     await page.goto('/my/requests');
-    await expect(page.getByRole('heading', { name: '我的申请' })).toBeVisible();
+    await expect(page.getByTestId('my-requests-page')).toBeVisible();
 
-    const reagentSelect = page.locator('select').nth(0);
-    const stockSelect = page.locator('select').nth(1);
+    await page.getByTestId('my-requests-add').click();
+    const dialog = page.getByTestId('my-requests-form');
+    await expect(dialog).toBeVisible();
 
-    const reagentOptions = await reagentSelect.locator('option').count();
-    test.skip(reagentOptions <= 1, 'no reagents seeded');
+    // 打开 reagent select
+    await dialog.getByTestId('my-requests-form-reagent').click();
+    const nonControlled = page.locator('[role="option"][data-controlled="false"]');
+    const ncCount = await nonControlled.count();
+    test.skip(ncCount === 0, 'no non-controlled reagent seeded');
+    await nonControlled.first().click();
 
-    // pick first non-controlled reagent (label without 管控)
-    const labels = await reagentSelect.locator('option').allTextContents();
-    const idx = labels.findIndex((t, i) => i > 0 && !t.includes('管控'));
-    test.skip(idx < 1, 'no non-controlled reagent available');
-    await reagentSelect.selectOption({ index: idx });
+    // 打开 stock select
+    await dialog.getByTestId('my-requests-form-stock').click();
+    const stockOptions = page.locator('[role="option"]');
+    const stockCount = await stockOptions.count();
+    test.skip(stockCount === 0, 'reagent has no stock; need admin receipt first');
+    await stockOptions.first().click();
 
-    const stockOptions = await stockSelect.locator('option').count();
-    test.skip(stockOptions <= 1, 'reagent has no stock; need admin receipt first');
-    await stockSelect.selectOption({ index: 1 });
+    await dialog.getByTestId('my-requests-form-qty').fill('1');
+    await dialog.getByTestId('my-requests-form-purpose').fill('e2e test purpose');
+    await dialog.getByTestId('my-requests-form-submit').click();
 
-    await page.getByPlaceholder('数量').fill('1');
-    await page.getByPlaceholder(/用途/).fill('e2e test');
-    await page.getByRole('button', { name: '提交' }).click();
+    // FormDialog onSubmit 成功后 caller 调 setFormOpen(false)
+    await expect(dialog).not.toBeVisible({ timeout: 10_000 });
 
+    // 表里出现 PENDING 行
     await expect(
-      page.locator('table tbody tr').filter({ hasText: 'PENDING' }).first(),
+      page
+        .getByTestId('my-requests-table')
+        .locator('tbody tr')
+        .filter({ hasText: 'PENDING' })
+        .first(),
     ).toBeVisible({ timeout: 10_000 });
   });
 });
 
-// Path 2 lives at /approvals. Buttons read 一审通过 / 一审拒绝 (and 二审 for
+// Path 2 lives at /approvals. Buttons read 一审通过/一审拒绝 (and 二审 for
 // controlled). Approving a row removes it from the PENDING-only list, so we
 // assert the count drops rather than searching for "APPROVED" text.
 test.describe('Path 2: LAB_HEAD approve', () => {
@@ -49,52 +58,54 @@ test.describe('Path 2: LAB_HEAD approve', () => {
 
   test('approve newest pending', async ({ page }) => {
     await page.goto('/approvals');
-    await expect(page.getByRole('heading', { name: '待我审批' })).toBeVisible();
+    await expect(page.getByTestId('approvals-page')).toBeVisible();
 
-    const items = page.locator('main ul > li');
+    const items = page.locator('[data-testid^="approvals-item-"]');
     const before = await items.count();
     test.skip(before === 0, 'no pending requests');
 
-    await page.getByRole('button', { name: '一审通过' }).first().click();
+    await page.locator('[data-testid^="approvals-tier1-approve-"]').first().click();
     await expect(items).toHaveCount(before - 1, { timeout: 10_000 });
   });
 });
 
-// Path 3 lives at /admin/issues. The waiting list uses <li> rows; each has an
-// 实际量 input (placeholder includes the unit) + a 发放 button.
+// Path 3 lives at /admin/issues. Pending list uses <li data-testid='admin-issues-row-{id}'>;
+// 实际量 input + 发放 button per row.
 test.describe('Path 3: REAGENT_ADMIN issue → ledger updates', () => {
   test.use({ storageState: stateFor('admin') });
 
   test('issue → row moves to ledger', async ({ page }) => {
     await page.goto('/admin/issues');
-    await expect(page.getByRole('heading', { name: '发放管理' })).toBeVisible();
+    await expect(page.getByTestId('admin-issues-page')).toBeVisible();
 
-    const pendingRows = page.locator('h3:has-text("待发放") + ul > li');
-    const ledgerRows = page.locator('table tbody tr');
+    const pendingRows = page.locator('[data-testid^="admin-issues-row-"]');
+    const ledger = page.getByTestId('admin-issues-history-table').locator('tbody tr');
     const pendingBefore = await pendingRows.count();
     test.skip(pendingBefore === 0, 'no APPROVED requests to issue');
 
-    const ledgerBefore = await ledgerRows.count();
+    const ledgerBefore = await ledger.count();
     const firstRow = pendingRows.first();
-    await firstRow.locator('input[placeholder*="实际量"]').fill('1');
-    await firstRow.getByRole('button', { name: '发放' }).click();
+    // 取该行的 id（从 testid 解析）
+    const testid = await firstRow.getAttribute('data-testid');
+    const id = testid!.replace('admin-issues-row-', '');
 
-    await expect(ledgerRows).toHaveCount(ledgerBefore + 1, { timeout: 10_000 });
+    await firstRow.locator(`[data-testid="admin-issues-row-${id}-qty"]`).fill('1');
+    await firstRow.locator(`[data-testid="admin-issues-row-${id}-issue"]`).click();
+
+    await expect(ledger).toHaveCount(ledgerBefore + 1, { timeout: 10_000 });
   });
 });
 
 // Path 4: admin purchase loop is split across /my/purchases (apply),
 // /admin/purchases (merge → receipt), /approvals/purchases (approve batch).
-// The full chain needs ≥1 PENDING purchase + LAB_HEAD approval; we only smoke
-// the admin pages here so the test is independent of seed state.
+// Smoke admin pages render only.
 test.describe('Path 4: REAGENT_ADMIN purchase admin pages render', () => {
   test.use({ storageState: stateFor('admin') });
 
-  test('/admin/purchases shows pending + batches sections', async ({ page }) => {
+  test('/admin/purchases shows merge button + page wrapper', async ({ page }) => {
     await page.goto('/admin/purchases');
-    await expect(
-      page.getByRole('heading', { name: '待合并采购申请' }),
-    ).toBeVisible();
-    await expect(page.getByRole('heading', { name: '批次' })).toBeVisible();
+    await expect(page.getByTestId('admin-purchases-page')).toBeVisible();
+    // merge button exists (disabled if nothing picked)
+    await expect(page.getByTestId('admin-purchases-merge')).toBeVisible();
   });
 });
