@@ -12,7 +12,7 @@ import {
   type RangePreset,
 } from '@/components/reports/RangePresetPicker';
 import { ExportButton } from '@/components/reports/ExportButton';
-import { useReportData } from '@/components/reports/useReportData';
+import { useApiQuery } from '@/lib/use-api-query';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import type { InventoryTurnoverResponse } from '@app/shared';
@@ -75,10 +75,11 @@ export default function InventoryTurnoverPage() {
   const [startDate, setStartDate] = useState<string>();
   const [endDate, setEndDate] = useState<string>();
 
-  const { data, loading, error } = useReportData<InventoryTurnoverResponse>(
+  const { data, isLoading: loading, error: queryError } = useApiQuery<InventoryTurnoverResponse>(
     '/reports/inventory-turnover',
-    { range, startDate, endDate },
+    { params: { range, startDate, endDate } },
   );
+  const error = queryError ? (queryError as Error).message : null;
 
   const params = new URLSearchParams();
   params.set('range', range);

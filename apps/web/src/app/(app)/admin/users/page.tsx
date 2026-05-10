@@ -1,6 +1,7 @@
 'use client';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { ColumnDef } from '@tanstack/react-table';
+import { useQueryClient } from '@tanstack/react-query';
 import { MoreHorizontal } from 'lucide-react';
 import { z } from 'zod';
 import { toast } from 'sonner';
@@ -28,6 +29,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Combobox } from '@/components/ui/combobox';
 import { apiFetch } from '@/lib/api-client';
+import { useApiQuery } from '@/lib/use-api-query';
 import { useAuth } from '@/lib/auth-store';
 
 interface UserRow {
@@ -61,37 +63,23 @@ type UpdateValues = z.infer<typeof updateSchema>;
 
 export default function UsersPage() {
   const token = useAuth((s) => s.tokens?.accessToken);
-  const [data, setData] = useState<UserRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const qc = useQueryClient();
+  const usersQuery = useApiQuery<UserRow[]>('/users', { queryKey: ['users'] });
+  const data = usersQuery.data ?? [];
+  const loading = usersQuery.isLoading;
+  const refresh = () => qc.invalidateQueries({ queryKey: ['users'] });
+
   const [editing, setEditing] = useState<UserRow | null>(null);
   const [resetting, setResetting] = useState<UserRow | null>(null);
-  const [labs, setLabs] = useState<LabRow[]>([]);
 
-  const refresh = useCallback(async () => {
-    if (!token) return;
-    setLoading(true);
-    try {
-      const d = await apiFetch<UserRow[]>('/users', { token });
-      setData(d);
-    } catch (e: any) {
-      toast.error(e.message ?? '加载失败');
-    } finally {
-      setLoading(false);
+  useEffect(() => {
+    if (usersQuery.error) {
+      toast.error((usersQuery.error as Error).message ?? '加载失败');
     }
-  }, [token]);
+  }, [usersQuery.error]);
 
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
-
-  useEffect(() => {
-    if (!token) return;
-    apiFetch<LabRow[]>('/labs', { token })
-      .then(setLabs)
-      .catch(() => {
-        // 静默失败,只是少了下拉选项
-      });
-  }, [token]);
+  const labsQuery = useApiQuery<LabRow[]>('/labs', { queryKey: ['labs'] });
+  const labs = labsQuery.data ?? [];
 
   const labOptions = useMemo(
     () => [

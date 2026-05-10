@@ -10,7 +10,7 @@ import {
   type RangePreset,
 } from '@/components/reports/RangePresetPicker';
 import { ExportButton } from '@/components/reports/ExportButton';
-import { useReportData } from '@/components/reports/useReportData';
+import { useApiQuery } from '@/lib/use-api-query';
 import {
   Select,
   SelectContent,
@@ -43,10 +43,11 @@ export default function UsageTrendPage() {
   const [endDate, setEndDate] = useState<string>();
   const [groupBy, setGroupBy] = useState<GroupBy>('day');
 
-  const { data, loading, error } = useReportData<UsageTrendResponse>(
+  const { data, isLoading: loading, error: queryError } = useApiQuery<UsageTrendResponse>(
     '/reports/usage-trend',
-    { range, startDate, endDate, groupBy },
+    { params: { range, startDate, endDate, groupBy } },
   );
+  const error = queryError ? (queryError as Error).message : null;
 
   const params = new URLSearchParams();
   params.set('range', range);

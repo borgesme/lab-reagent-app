@@ -10,7 +10,7 @@ import {
   type RangePreset,
 } from '@/components/reports/RangePresetPicker';
 import { ExportButton } from '@/components/reports/ExportButton';
-import { useReportData } from '@/components/reports/useReportData';
+import { useApiQuery } from '@/lib/use-api-query';
 import {
   Select,
   SelectContent,
@@ -43,10 +43,11 @@ export default function PurchaseAmountPage() {
   const [endDate, setEndDate] = useState<string>();
   const [groupBy, setGroupBy] = useState<GroupBy>('month');
 
-  const { data, loading, error } = useReportData<PurchaseAmountResponse>(
+  const { data, isLoading: loading, error: queryError } = useApiQuery<PurchaseAmountResponse>(
     '/reports/purchase-amount',
-    { range, startDate, endDate, groupBy },
+    { params: { range, startDate, endDate, groupBy } },
   );
+  const error = queryError ? (queryError as Error).message : null;
 
   const params = new URLSearchParams();
   params.set('range', range);

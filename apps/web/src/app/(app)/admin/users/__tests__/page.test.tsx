@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import UsersPage from '../page';
 import { useAuth } from '@/lib/auth-store';
 
@@ -27,6 +28,15 @@ vi.mock('@/components/ui/combobox', () => ({
     />
   ),
 }));
+
+function renderWithQuery(ui: React.ReactElement) {
+  const qc = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: 0 } },
+  });
+  return render(
+    <QueryClientProvider client={qc}>{ui}</QueryClientProvider>,
+  );
+}
 
 const usersFixture = [
   {
@@ -64,7 +74,7 @@ describe('/admin/users page', () => {
 
   it('编辑用户 → PATCH 调用 + dialog 关闭 + 表刷新', async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
-    render(<UsersPage />);
+    renderWithQuery(<UsersPage />);
 
     await waitFor(() => screen.getByText('Alice'));
 
@@ -90,7 +100,7 @@ describe('/admin/users page', () => {
   it('重置密码 → POST 调用 + toast 含临时密码', async () => {
     const { toast } = await import('sonner');
     const user = userEvent.setup({ pointerEventsCheck: 0 });
-    render(<UsersPage />);
+    renderWithQuery(<UsersPage />);
 
     await waitFor(() => screen.getByText('Alice'));
     await user.click(screen.getByTestId('admin-users-row-u1-actions'));
@@ -122,7 +132,7 @@ describe('/admin/users page', () => {
     });
 
     const user = userEvent.setup({ pointerEventsCheck: 0 });
-    render(<UsersPage />);
+    renderWithQuery(<UsersPage />);
     await waitFor(() => screen.getByText('Alice'));
 
     await user.click(screen.getByTestId('admin-users-row-u1-actions'));

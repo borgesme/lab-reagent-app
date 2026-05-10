@@ -1,6 +1,7 @@
 import { RequireAuth } from '@/components/RequireAuth';
 import { AppShell } from '@/components/shell/AppShell';
 import { Toaster } from '@/components/ui/sonner';
+import { QueryProvider } from './QueryProvider';
 
 export default function AppLayout({
   children,
@@ -9,8 +10,10 @@ export default function AppLayout({
 }) {
   return (
     <RequireAuth>
-      <AppShell>{children}</AppShell>
-      <Toaster richColors position="top-right" />
+      <QueryProvider>
+        <AppShell>{children}</AppShell>
+        <Toaster richColors position="top-right" />
+      </QueryProvider>
     </RequireAuth>
   );
 }

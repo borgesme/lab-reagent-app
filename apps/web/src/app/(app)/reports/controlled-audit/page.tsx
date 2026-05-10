@@ -10,7 +10,7 @@ import {
   type RangePreset,
 } from '@/components/reports/RangePresetPicker';
 import { ExportButton } from '@/components/reports/ExportButton';
-import { useReportData } from '@/components/reports/useReportData';
+import { useApiQuery } from '@/lib/use-api-query';
 import { Card } from '@/components/ui/card';
 import type { ControlledAuditResponse } from '@app/shared';
 
@@ -57,10 +57,11 @@ export default function ControlledAuditPage() {
   const [startDate, setStartDate] = useState<string>();
   const [endDate, setEndDate] = useState<string>();
 
-  const { data, loading, error } = useReportData<ControlledAuditResponse>(
+  const { data, isLoading: loading, error: queryError } = useApiQuery<ControlledAuditResponse>(
     '/reports/controlled-audit',
-    { range, startDate, endDate },
+    { params: { range, startDate, endDate } },
   );
+  const error = queryError ? (queryError as Error).message : null;
 
   const params = new URLSearchParams();
   params.set('range', range);
