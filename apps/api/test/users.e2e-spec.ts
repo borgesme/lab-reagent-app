@@ -65,4 +65,32 @@ describe('Users', () => {
       .set('Authorization', `Bearer ${login.body.accessToken}`);
     expect(r.status).toBe(403);
   });
+
+  it('reset-password 后旧 access token 立即 401', async () => {
+    const loginRes = await request(app.getHttpServer())
+      .post('/auth/login')
+      .send({ email: 'bob@lab.local', password: 'pass1234' });
+    expect(loginRes.status).toBe(200);
+    const bobToken = loginRes.body.accessToken;
+
+    const me1 = await request(app.getHttpServer())
+      .get('/auth/me')
+      .set('Authorization', `Bearer ${bobToken}`);
+    expect(me1.status).toBe(200);
+
+    const bob = await prisma.user.findUnique({
+      where: { email: 'bob@lab.local' },
+    });
+    expect(bob).toBeTruthy();
+
+    const reset = await request(app.getHttpServer())
+      .post(`/users/${bob!.id}/reset-password`)
+      .set('Authorization', `Bearer ${adminToken}`);
+    expect(reset.status).toBe(200);
+
+    const me2 = await request(app.getHttpServer())
+      .get('/auth/me')
+      .set('Authorization', `Bearer ${bobToken}`);
+    expect(me2.status).toBe(401);
+  });
 });

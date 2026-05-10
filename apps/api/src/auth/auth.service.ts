@@ -46,7 +46,7 @@ export class AuthService {
     const ok = await bcrypt.compare(dto.password, user.passwordHash);
     if (!ok) throw new UnauthorizedException();
     const roles = user.roles.map((ur) => ur.role.code);
-    return this.issueTokens(user.id, roles);
+    return this.issueTokens(user.id, roles, user.tokenVersion);
   }
 
   async me(userId: string) {
@@ -75,15 +75,18 @@ export class AuthService {
       if (!payload.jti || user.currentRefreshJti !== payload.jti) {
         throw new UnauthorizedException();
       }
-      return this.issueTokens(payload.sub, payload.roles);
+      if (payload.ver !== user.tokenVersion) {
+        throw new UnauthorizedException();
+      }
+      return this.issueTokens(payload.sub, payload.roles, user.tokenVersion);
     } catch {
       throw new UnauthorizedException();
     }
   }
 
-  private async issueTokens(sub: string, roles: string[]) {
+  private async issueTokens(sub: string, roles: string[], ver: number) {
     const accessToken = await this.jwt.signAsync(
-      { sub, roles },
+      { sub, roles, ver },
       {
         secret: this.cfg.getOrThrow('JWT_ACCESS_SECRET'),
         expiresIn: this.cfg.get('JWT_ACCESS_TTL') ?? '15m',
@@ -91,7 +94,7 @@ export class AuthService {
     );
     const jti = randomUUID();
     const refreshToken = await this.jwt.signAsync(
-      { sub, roles, jti },
+      { sub, roles, jti, ver },
       {
         secret: this.cfg.getOrThrow('JWT_REFRESH_SECRET'),
         expiresIn: this.cfg.get('JWT_REFRESH_TTL') ?? '7d',

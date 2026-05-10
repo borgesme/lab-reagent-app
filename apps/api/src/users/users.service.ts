@@ -56,7 +56,7 @@ export class UsersService {
   async softDelete(id: string) {
     return this.prisma.user.update({
       where: { id },
-      data: { deletedAt: new Date() },
+      data: { deletedAt: new Date(), tokenVersion: { increment: 1 } },
     });
   }
 
@@ -67,7 +67,7 @@ export class UsersService {
     const passwordHash = await bcrypt.hash(tempPassword, 10);
     await this.prisma.user.update({
       where: { id },
-      data: { passwordHash },
+      data: { passwordHash, tokenVersion: { increment: 1 } },
     });
     return { tempPassword };
   }
