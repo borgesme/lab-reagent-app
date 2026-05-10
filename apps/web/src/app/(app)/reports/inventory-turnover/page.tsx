@@ -1,14 +1,20 @@
 'use client';
 import { useState } from 'react';
 import dynamic from 'next/dynamic';
+import type { ColumnDef } from '@tanstack/react-table';
+import { PageHeader } from '@/components/data/PageHeader';
+import { Toolbar } from '@/components/data/Toolbar';
+import { DataTable } from '@/components/data/DataTable';
 import { KpiCard } from '@/components/reports/KpiCard';
 import { ChartCard } from '@/components/reports/ChartCard';
 import {
-  DateRangePicker,
+  RangePresetPicker,
   type RangePreset,
-} from '@/components/reports/DateRangePicker';
+} from '@/components/reports/RangePresetPicker';
 import { ExportButton } from '@/components/reports/ExportButton';
 import { useReportData } from '@/components/reports/useReportData';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import type { InventoryTurnoverResponse } from '@app/shared';
 
 const BarChart = dynamic(
@@ -26,10 +32,48 @@ const ResponsiveContainer = dynamic(
   { ssr: false },
 );
 
+type Row = InventoryTurnoverResponse['rows'][number];
+
+const detailColumns: ColumnDef<Row>[] = [
+  { accessorKey: 'name', header: '试剂' },
+  {
+    accessorKey: 'currentQty',
+    header: '现存',
+    cell: ({ row }) => (
+      <span className="tabular-nums">{row.original.currentQty}</span>
+    ),
+  },
+  {
+    accessorKey: 'dailyOut',
+    header: '日均出',
+    cell: ({ row }) => (
+      <span className="tabular-nums">{row.original.dailyOut}</span>
+    ),
+  },
+  {
+    accessorKey: 'turnoverDays',
+    header: '周转天数',
+    cell: ({ row }) => (
+      <span className="tabular-nums">{row.original.turnoverDays}</span>
+    ),
+  },
+  {
+    accessorKey: 'status',
+    header: '状态',
+    cell: ({ row }) => {
+      const s = row.original.status;
+      const variant: 'default' | 'secondary' | 'destructive' =
+        s === 'low' ? 'destructive' : s === 'stale' ? 'secondary' : 'default';
+      const label = s === 'low' ? '低' : s === 'stale' ? '滞销' : '正常';
+      return <Badge variant={variant}>{label}</Badge>;
+    },
+  },
+];
+
 export default function InventoryTurnoverPage() {
   const [range, setRange] = useState<RangePreset>('30d');
-  const [startDate, setStartDate] = useState<string | undefined>();
-  const [endDate, setEndDate] = useState<string | undefined>();
+  const [startDate, setStartDate] = useState<string>();
+  const [endDate, setEndDate] = useState<string>();
 
   const { data, loading, error } = useReportData<InventoryTurnoverResponse>(
     '/reports/inventory-turnover',
@@ -40,6 +84,7 @@ export default function InventoryTurnoverPage() {
   params.set('range', range);
   if (startDate) params.set('startDate', startDate);
   if (endDate) params.set('endDate', endDate);
+  const exportEndpoint = `/reports/inventory-turnover?${params.toString()}`;
 
   const top10 = (data?.rows ?? [])
     .filter((r) => r.status !== 'stale')
@@ -48,11 +93,11 @@ export default function InventoryTurnoverPage() {
     .slice(0, 10);
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-xl font-semibold">库存周转</h2>
-        <div className="flex gap-2">
-          <DateRangePicker
+    <div data-testid="reports-inventory-turnover-page">
+      <PageHeader title="库存周转" subtitle="试剂周转天数与低库存预警" />
+      <Toolbar
+        filters={
+          <RangePresetPicker
             range={range}
             startDate={startDate}
             endDate={endDate}
@@ -61,19 +106,33 @@ export default function InventoryTurnoverPage() {
               setStartDate(n.startDate);
               setEndDate(n.endDate);
             }}
+            testId="reports-inventory-turnover-range"
           />
+        }
+        actions={
           <ExportButton
-            endpoint={`/reports/inventory-turnover?${params.toString()}`}
+            endpoint={exportEndpoint}
+            testId="reports-inventory-turnover-export"
           />
-        </div>
-      </div>
+        }
+      />
 
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+      <div
+        className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2"
+        data-testid="reports-inventory-turnover-kpis"
+      >
         <KpiCard
           label="平均周转天数"
-          value={data?.summary.avgTurnoverDays ?? '—'}
+          value={data?.summary.avgTurnoverDays}
+          loading={loading}
+          testId="reports-inventory-turnover-kpi-avg-turnover"
         />
-        <KpiCard label="低库存数量" value={data?.summary.lowStockCount ?? '—'} />
+        <KpiCard
+          label="低库存数量"
+          value={data?.summary.lowStockCount}
+          loading={loading}
+          testId="reports-inventory-turnover-kpi-low-stock"
+        />
       </div>
 
       <ChartCard
@@ -81,50 +140,27 @@ export default function InventoryTurnoverPage() {
         loading={loading}
         error={error}
         empty={!loading && !error && top10.length === 0}
+        testId="reports-inventory-turnover-chart"
       >
         <ResponsiveContainer width="100%" height={320}>
           <BarChart data={top10}>
             <XAxis dataKey="name" />
             <YAxis />
             <Tooltip />
-            <Bar dataKey="turnoverDays" fill="#1677ff" />
+            <Bar dataKey="turnoverDays" fill="hsl(var(--primary))" />
           </BarChart>
         </ResponsiveContainer>
       </ChartCard>
 
-      <div className="rounded border border-gray-200 bg-white p-4 shadow-sm">
-        <h3 className="mb-3 text-base font-medium">完整明细</h3>
-        <table className="w-full text-sm">
-          <thead className="text-left text-gray-500">
-            <tr>
-              <th className="py-1">试剂</th>
-              <th className="py-1">现存</th>
-              <th className="py-1">日均出</th>
-              <th className="py-1">周转天数</th>
-              <th className="py-1">状态</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(data?.rows ?? []).map((r) => (
-              <tr key={r.reagentId} className="border-t">
-                <td className="py-1">{r.name}</td>
-                <td className="py-1">{r.currentQty}</td>
-                <td className="py-1">{r.dailyOut}</td>
-                <td className="py-1">{r.turnoverDays}</td>
-                <td className="py-1">
-                  {r.status === 'low' && (
-                    <span className="text-red-600">低</span>
-                  )}
-                  {r.status === 'stale' && (
-                    <span className="text-yellow-600">滞销</span>
-                  )}
-                  {r.status === 'ok' && <span className="text-green-600">正常</span>}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <Card className="mt-4 p-2">
+        <DataTable
+          columns={detailColumns}
+          data={data?.rows ?? []}
+          loading={loading}
+          testId="reports-inventory-turnover-detail-table"
+          emptyTitle="暂无明细"
+        />
+      </Card>
     </div>
   );
 }
