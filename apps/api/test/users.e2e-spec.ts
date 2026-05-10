@@ -93,4 +93,79 @@ describe('Users', () => {
       .set('Authorization', `Bearer ${bobToken}`);
     expect(me2.status).toBe(401);
   });
+
+  it('admin patches user name + roles', async () => {
+    const bob = await prisma.user.findUnique({
+      where: { email: 'bob@lab.local' },
+    });
+    expect(bob).toBeTruthy();
+    const r = await request(app.getHttpServer())
+      .patch(`/users/${bob!.id}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ name: 'Bob Renamed', roles: ['LAB_HEAD'] });
+    expect(r.status).toBe(200);
+    expect(r.body.name).toBe('Bob Renamed');
+
+    const fresh = await prisma.user.findUnique({
+      where: { id: bob!.id },
+      include: { roles: { include: { role: true } } },
+    });
+    expect(fresh!.roles.map((ur) => ur.role.code)).toEqual(['LAB_HEAD']);
+  });
+
+  it('admin patches non-existent user → 404', async () => {
+    const r = await request(app.getHttpServer())
+      .patch('/users/non-existent-id')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ name: 'X' });
+    expect(r.status).toBe(404);
+  });
+
+  it('admin deletes(soft) user', async () => {
+    const r = await request(app.getHttpServer())
+      .post('/users')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        email: 'erin@lab.local',
+        name: 'Erin',
+        password: 'pass1234',
+        roles: ['PLAIN_USER'],
+      });
+    expect(r.status).toBe(201);
+    const erinId = r.body.id;
+
+    const del = await request(app.getHttpServer())
+      .delete(`/users/${erinId}`)
+      .set('Authorization', `Bearer ${adminToken}`);
+    expect(del.status).toBe(200);
+
+    const erin = await prisma.user.findUnique({ where: { id: erinId } });
+    expect(erin?.deletedAt).not.toBeNull();
+
+    const list = await request(app.getHttpServer())
+      .get('/users')
+      .set('Authorization', `Bearer ${adminToken}`);
+    expect(list.body.find((u: any) => u.id === erinId)).toBeUndefined();
+
+    await prisma.userRole.deleteMany({ where: { userId: erinId } });
+    await prisma.user.delete({ where: { id: erinId } });
+  });
+
+  it('admin resets password 返回 8 位字符串', async () => {
+    const bob = await prisma.user.findUnique({
+      where: { email: 'bob@lab.local' },
+    });
+    const r = await request(app.getHttpServer())
+      .post(`/users/${bob!.id}/reset-password`)
+      .set('Authorization', `Bearer ${adminToken}`);
+    expect(r.status).toBe(200);
+    expect(r.body.tempPassword).toMatch(/^[A-Za-z]{4}[0-9]{4}$/);
+  });
+
+  it('reset-password 不存在用户 → 404', async () => {
+    const r = await request(app.getHttpServer())
+      .post('/users/non-existent-id/reset-password')
+      .set('Authorization', `Bearer ${adminToken}`);
+    expect(r.status).toBe(404);
+  });
 });
