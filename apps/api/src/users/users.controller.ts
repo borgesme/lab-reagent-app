@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
   Param,
   Patch,
   Post,
@@ -39,5 +40,12 @@ export class UsersController {
   @Audit({ action: 'USER_DELETE', entityType: 'User' })
   remove(@Param('id') id: string) {
     return this.users.softDelete(id);
+  }
+
+  @Post(':id/reset-password')
+  @HttpCode(200)
+  @Audit({ action: 'USER_RESET_PASSWORD', entityType: 'User' })
+  resetPassword(@Param('id') id: string) {
+    return this.users.resetPassword(id);
   }
 }

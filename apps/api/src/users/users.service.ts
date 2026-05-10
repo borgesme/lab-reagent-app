@@ -60,6 +60,28 @@ export class UsersService {
     });
   }
 
+  async resetPassword(id: string): Promise<{ tempPassword: string }> {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user || user.deletedAt) throw new NotFoundException();
+    const tempPassword = this.generateTempPassword();
+    const passwordHash = await bcrypt.hash(tempPassword, 10);
+    await this.prisma.user.update({
+      where: { id },
+      data: { passwordHash },
+    });
+    return { tempPassword };
+  }
+
+  private generateTempPassword(): string {
+    const letters = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ';
+    const digits = '23456789';
+    const pickN = (src: string, n: number) =>
+      Array.from({ length: n }, () =>
+        src[Math.floor(Math.random() * src.length)],
+      ).join('');
+    return pickN(letters, 4) + pickN(digits, 4);
+  }
+
   private async resolveRoles(codes: RoleCode[]) {
     return this.prisma.role.findMany({ where: { code: { in: codes } } });
   }
