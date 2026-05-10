@@ -2598,6 +2598,7 @@ import {
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import {
   DropdownMenu,
@@ -2815,11 +2816,10 @@ export default function UsersPage() {
                           key={r}
                           className="flex cursor-pointer items-center gap-2 text-sm"
                         >
-                          <input
-                            type="checkbox"
+                          <Checkbox
                             checked={checked}
-                            onChange={(e) => {
-                              const next = e.target.checked
+                            onCheckedChange={(v) => {
+                              const next = v === true
                                 ? [...(field.value as string[]), r]
                                 : (field.value as string[]).filter(
                                     (x) => x !== r,
@@ -2870,7 +2870,7 @@ export default function UsersPage() {
 ```
 
 > 说明：
-> - 编辑用 native `<input type="checkbox">` 不引入 Checkbox 组件（P8b 已加 ui/checkbox.tsx 但本期保持简单）
+> - 编辑角色用 shadcn `Checkbox`（基于 Radix `@radix-ui/react-checkbox`，P8b 已 add `ui/checkbox.tsx`）；外层 `<label>` 隐式关联，浏览器会把 click 转发到 Radix 渲染的 `<button>`；`onCheckedChange` 回调值类型 `boolean | 'indeterminate'`，按 `=== true` 严格判断
 > - 临时密码 `toast.success(..., { duration: 30_000 })` 显示 30s 让管理员有时间复制
 > - "实验室 ID 留空" 走 `labId: '' → undefined`，后端 service 已处理
 

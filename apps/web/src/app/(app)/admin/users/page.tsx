@@ -18,6 +18,7 @@ import {
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import {
   DropdownMenu,
@@ -235,11 +236,10 @@ export default function UsersPage() {
                           key={r}
                           className="flex cursor-pointer items-center gap-2 text-sm"
                         >
-                          <input
-                            type="checkbox"
+                          <Checkbox
                             checked={checked}
-                            onChange={(e) => {
-                              const next = e.target.checked
+                            onCheckedChange={(v) => {
+                              const next = v === true
                                 ? [...(field.value as string[]), r]
                                 : (field.value as string[]).filter(
                                     (x) => x !== r,
