@@ -1,6 +1,7 @@
 'use client';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { ColumnDef } from '@tanstack/react-table';
+import { useQueryClient } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
 import { z } from 'zod';
 import { toast } from 'sonner';
@@ -18,6 +19,7 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { apiFetch } from '@/lib/api-client';
+import { useApiQuery } from '@/lib/use-api-query';
 import { useAuth } from '@/lib/auth-store';
 
 interface Lab {
@@ -45,26 +47,18 @@ const columns: ColumnDef<Lab>[] = [
 
 export default function LabsPage() {
   const token = useAuth((s) => s.tokens?.accessToken);
-  const [data, setData] = useState<Lab[]>([]);
-  const [loading, setLoading] = useState(true);
+  const qc = useQueryClient();
+  const labsQuery = useApiQuery<Lab[]>('/labs', { queryKey: ['labs'] });
+  const data = labsQuery.data ?? [];
+  const loading = labsQuery.isLoading;
+  const refresh = () => qc.invalidateQueries({ queryKey: ['labs'] });
   const [formOpen, setFormOpen] = useState(false);
 
-  const refresh = useCallback(async () => {
-    if (!token) return;
-    setLoading(true);
-    try {
-      const list = await apiFetch<Lab[]>('/labs', { token });
-      setData(list);
-    } catch (e: any) {
-      toast.error(e.message ?? '加载失败');
-    } finally {
-      setLoading(false);
-    }
-  }, [token]);
-
   useEffect(() => {
-    refresh();
-  }, [refresh]);
+    if (labsQuery.error) {
+      toast.error((labsQuery.error as Error).message ?? '加载失败');
+    }
+  }, [labsQuery.error]);
 
   const defaultValues = useMemo(() => ({ name: '', building: '' }), []);
 

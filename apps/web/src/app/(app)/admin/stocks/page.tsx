@@ -1,6 +1,7 @@
 'use client';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { ColumnDef } from '@tanstack/react-table';
+import { useQueryClient } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
 import { z } from 'zod';
 import { toast } from 'sonner';
@@ -25,6 +26,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { apiFetch } from '@/lib/api-client';
+import { useApiQuery } from '@/lib/use-api-query';
 import { useAuth } from '@/lib/auth-store';
 
 interface Stock {
@@ -79,34 +81,25 @@ const columns: ColumnDef<Stock>[] = [
 
 export default function StocksPage() {
   const token = useAuth((s) => s.tokens?.accessToken);
-  const [stocks, setStocks] = useState<Stock[]>([]);
-  const [reagents, setReagents] = useState<Reagent[]>([]);
-  const [labs, setLabs] = useState<Lab[]>([]);
-  const [loading, setLoading] = useState(true);
+  const qc = useQueryClient();
+  const stocksQuery = useApiQuery<Stock[]>('/stocks', { queryKey: ['stocks'] });
+  const reagentsQuery = useApiQuery<Reagent[]>('/reagents', {
+    queryKey: ['reagents'],
+  });
+  const labsQuery = useApiQuery<Lab[]>('/labs', { queryKey: ['labs'] });
+  const stocks = stocksQuery.data ?? [];
+  const reagents = reagentsQuery.data ?? [];
+  const labs = labsQuery.data ?? [];
+  const loading =
+    stocksQuery.isLoading || reagentsQuery.isLoading || labsQuery.isLoading;
+  const refresh = () => qc.invalidateQueries({ queryKey: ['stocks'] });
   const [formOpen, setFormOpen] = useState(false);
 
-  const refresh = useCallback(async () => {
-    if (!token) return;
-    setLoading(true);
-    try {
-      const [s, r, l] = await Promise.all([
-        apiFetch<Stock[]>('/stocks', { token }),
-        apiFetch<Reagent[]>('/reagents', { token }),
-        apiFetch<Lab[]>('/labs', { token }),
-      ]);
-      setStocks(s);
-      setReagents(r);
-      setLabs(l);
-    } catch (e: any) {
-      toast.error(e.message ?? '加载失败');
-    } finally {
-      setLoading(false);
-    }
-  }, [token]);
-
   useEffect(() => {
-    refresh();
-  }, [refresh]);
+    const err =
+      stocksQuery.error ?? reagentsQuery.error ?? labsQuery.error;
+    if (err) toast.error((err as Error).message ?? '加载失败');
+  }, [stocksQuery.error, reagentsQuery.error, labsQuery.error]);
 
   const defaultValues = useMemo(
     () => ({

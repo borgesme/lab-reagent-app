@@ -9,8 +9,7 @@ import { Toolbar } from '@/components/data/Toolbar';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { apiFetch } from '@/lib/api-client';
-import { useAuth } from '@/lib/auth-store';
+import { useApiQuery } from '@/lib/use-api-query';
 
 interface Reagent {
   id: string;
@@ -30,25 +29,25 @@ function hazardVariant(level: string, controlType?: string | null) {
 }
 
 export default function ReagentsPage() {
-  const token = useAuth((s) => s.tokens?.accessToken);
-  const [items, setItems] = useState<Reagent[]>([]);
-  const [loading, setLoading] = useState(true);
   const [q, setQ] = useState('');
+  const [debouncedQ, setDebouncedQ] = useState('');
+  useEffect(() => {
+    const handle = setTimeout(() => setDebouncedQ(q), 300);
+    return () => clearTimeout(handle);
+  }, [q]);
+
+  const reagentsQuery = useApiQuery<Reagent[]>('/reagents', {
+    params: { q: debouncedQ || undefined },
+    queryKey: ['reagents', debouncedQ],
+  });
+  const items = reagentsQuery.data ?? [];
+  const loading = reagentsQuery.isLoading;
 
   useEffect(() => {
-    if (!token) return;
-    const handle = setTimeout(() => {
-      setLoading(true);
-      apiFetch<Reagent[]>(
-        `/reagents${q ? `?q=${encodeURIComponent(q)}` : ''}`,
-        { token },
-      )
-        .then(setItems)
-        .catch((e: any) => toast.error(e.message ?? '加载失败'))
-        .finally(() => setLoading(false));
-    }, 300);
-    return () => clearTimeout(handle);
-  }, [token, q]);
+    if (reagentsQuery.error) {
+      toast.error((reagentsQuery.error as Error).message ?? '加载失败');
+    }
+  }, [reagentsQuery.error]);
 
   const columns = useMemo<ColumnDef<Reagent>[]>(
     () => [
