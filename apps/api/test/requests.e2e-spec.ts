@@ -1,6 +1,7 @@
 import { Test } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
+import * as bcrypt from 'bcryptjs';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 
@@ -12,6 +13,39 @@ describe('Requests', () => {
   let plainUserId: string;
   let reagentId: string;
   let stockId: string;
+
+  async function ensureFixtureUser(
+    email: string,
+    name: string,
+    password = 'pass1234',
+  ) {
+    const hash = await bcrypt.hash(password, 10);
+    const plainRole = await prisma.role.findUniqueOrThrow({
+      where: { code: 'PLAIN_USER' },
+    });
+    const user = await prisma.user.upsert({
+      where: { email },
+      update: {
+        name,
+        passwordHash: hash,
+        tokenVersion: 0,
+        deletedAt: null,
+        currentRefreshJti: null,
+        labId: null,
+      },
+      create: {
+        email,
+        name,
+        passwordHash: hash,
+        roles: { create: [{ roleId: plainRole.id }] },
+      },
+    });
+    await prisma.userRole.deleteMany({ where: { userId: user.id } });
+    await prisma.userRole.create({
+      data: { userId: user.id, roleId: plainRole.id },
+    });
+    return user;
+  }
 
   beforeAll(async () => {
     const mod = await Test.createTestingModule({ imports: [AppModule] }).compile();
@@ -29,9 +63,7 @@ describe('Requests', () => {
       .send({ email: 'admin@lab.local', password: 'admin123' });
     adminToken = adminLogin.body.accessToken;
 
-    await request(app.getHttpServer())
-      .post('/auth/register')
-      .send({ email: 'requester@lab.local', name: 'Requester', password: 'pass1234' });
+    await ensureFixtureUser('requester@lab.local', 'Requester');
     const reqLogin = await request(app.getHttpServer())
       .post('/auth/login')
       .send({ email: 'requester@lab.local', password: 'pass1234' });
@@ -164,9 +196,7 @@ describe('Requests', () => {
   });
 
   it('cannot cancel other user request', async () => {
-    await request(app.getHttpServer())
-      .post('/auth/register')
-      .send({ email: 'other@lab.local', name: 'Other', password: 'pass1234' });
+    await ensureFixtureUser('other@lab.local', 'Other');
     const otherLogin = await request(app.getHttpServer())
       .post('/auth/login')
       .send({ email: 'other@lab.local', password: 'pass1234' });
@@ -274,9 +304,7 @@ describe('Requests', () => {
     let pendingRequestId: string;
 
     beforeAll(async () => {
-      await request(app.getHttpServer())
-        .post('/auth/register')
-        .send({ email: 'labhead@lab.local', name: 'LabHead', password: 'pass1234' });
+      await ensureFixtureUser('labhead@lab.local', 'LabHead');
       const u = await prisma.user.findUnique({ where: { email: 'labhead@lab.local' } });
       labHeadId = u!.id;
       const labHeadRole = await prisma.role.findUniqueOrThrow({
@@ -362,9 +390,7 @@ describe('Requests', () => {
       let ctrlPendingId: string;
 
       beforeAll(async () => {
-        await request(app.getHttpServer())
-          .post('/auth/register')
-          .send({ email: 'safety@lab.local', name: 'Safety', password: 'pass1234' });
+        await ensureFixtureUser('safety@lab.local', 'Safety');
         const u = await prisma.user.findUnique({ where: { email: 'safety@lab.local' } });
         safetyId = u!.id;
         const role = await prisma.role.findUniqueOrThrow({ where: { code: 'SAFETY_OFFICER' } });
