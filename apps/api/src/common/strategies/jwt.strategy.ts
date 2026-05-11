@@ -7,7 +7,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
-    cfg: ConfigService,
+    private cfg: ConfigService,
     private prisma: PrismaService,
   ) {
     super({
@@ -21,7 +21,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       select: { tokenVersion: true, deletedAt: true },
     });
     if (!user || user.deletedAt) throw new UnauthorizedException();
-    if (payload.ver !== user.tokenVersion) throw new UnauthorizedException();
+    const allowLegacy = this.cfg.get('JWT_ALLOW_LEGACY_CLAIMS') === '1';
+    if (payload.ver === undefined) {
+      if (!allowLegacy) throw new UnauthorizedException();
+    } else if (payload.ver !== user.tokenVersion) {
+      throw new UnauthorizedException();
+    }
     return { sub: payload.sub, roles: payload.roles };
   }
 }

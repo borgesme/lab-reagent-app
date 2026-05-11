@@ -6,7 +6,7 @@ export const apiBaseUrl =
 
 let refreshInflight: Promise<string | null> | null = null;
 
-async function tryRefresh(): Promise<string | null> {
+export async function tryRefresh(): Promise<string | null> {
   if (refreshInflight) return refreshInflight;
   const refreshToken = useAuth.getState().tokens?.refreshToken;
   if (!refreshToken) return null;

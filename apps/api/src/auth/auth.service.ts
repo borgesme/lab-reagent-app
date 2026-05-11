@@ -72,11 +72,18 @@ export class AuthService {
         where: { id: payload.sub },
       });
       if (!user || user.deletedAt) throw new UnauthorizedException();
-      if (!payload.jti || user.currentRefreshJti !== payload.jti) {
-        throw new UnauthorizedException();
-      }
-      if (payload.ver !== user.tokenVersion) {
-        throw new UnauthorizedException();
+      const allowLegacy = this.cfg.get('JWT_ALLOW_LEGACY_CLAIMS') === '1';
+      const isLegacy =
+        payload.jti === undefined && payload.ver === undefined;
+      if (isLegacy) {
+        if (!allowLegacy) throw new UnauthorizedException();
+      } else {
+        if (!payload.jti || user.currentRefreshJti !== payload.jti) {
+          throw new UnauthorizedException();
+        }
+        if (payload.ver !== user.tokenVersion) {
+          throw new UnauthorizedException();
+        }
       }
       return this.issueTokens(payload.sub, payload.roles, user.tokenVersion);
     } catch {
