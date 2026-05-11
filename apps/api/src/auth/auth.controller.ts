@@ -3,6 +3,7 @@ import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { UpdateMeDto } from './dto/update-me.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { Public } from '../common/decorators/public.decorator';
 import { Audit } from '../common/decorators/audit.decorator';
 
@@ -39,5 +40,12 @@ export class AuthController {
   @Audit({ action: 'USER_UPDATE_SELF', entityType: 'User' })
   updateMe(@Req() req: any, @Body() dto: UpdateMeDto) {
     return this.auth.updateMe(req.user.sub, dto);
+  }
+
+  @Post('change-password')
+  @HttpCode(200)
+  @Audit({ action: 'USER_CHANGE_PASSWORD', entityType: 'User' })
+  changePassword(@Req() req: any, @Body() dto: ChangePasswordDto) {
+    return this.auth.changePassword(req.user.sub, dto);
   }
 }

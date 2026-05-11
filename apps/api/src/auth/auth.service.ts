@@ -71,6 +71,29 @@ export class AuthService {
     return this.me(userId);
   }
 
+  async changePassword(
+    userId: string,
+    dto: { currentPassword: string; newPassword: string },
+  ) {
+    const user = await this.prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      include: { roles: { include: { role: true } } },
+    });
+    const ok = await bcrypt.compare(dto.currentPassword, user.passwordHash);
+    if (!ok) throw new UnauthorizedException();
+    const passwordHash = await bcrypt.hash(dto.newPassword, 10);
+    const updated = await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        passwordHash,
+        tokenVersion: { increment: 1 },
+      },
+      select: { tokenVersion: true },
+    });
+    const roles = user.roles.map((ur) => ur.role.code);
+    return this.issueTokens(userId, roles, updated.tokenVersion);
+  }
+
   async refresh(token: string) {
     try {
       const payload = await this.jwt.verifyAsync(token, {

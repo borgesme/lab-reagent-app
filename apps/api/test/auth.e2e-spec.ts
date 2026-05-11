@@ -231,4 +231,77 @@ describe('Auth', () => {
       expect(res.body.roles).toEqual(expect.arrayContaining(['SYS_ADMIN']));
     });
   });
+
+  describe('POST /auth/change-password', () => {
+    const initialPwd = 'pw-init-1234';
+    const newPwd = 'pw-new-5678';
+    let userEmail: string;
+
+    beforeAll(async () => {
+      userEmail = `pwd-test-${Date.now()}@lab.local`;
+      const reg = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({ email: userEmail, name: 'PwdTest', password: initialPwd });
+      expect(reg.status).toBe(201);
+    });
+
+    async function login(password: string) {
+      return request(app.getHttpServer())
+        .post('/auth/login')
+        .send({ email: userEmail, password });
+    }
+
+    it('当前密码错 → 401, 密码不变', async () => {
+      const lg = await login(initialPwd);
+      expect(lg.status).toBe(200);
+      const res = await request(app.getHttpServer())
+        .post('/auth/change-password')
+        .set('Authorization', `Bearer ${lg.body.accessToken}`)
+        .send({ currentPassword: 'wrong', newPassword: newPwd });
+      expect(res.status).toBe(401);
+      const reLogin = await login(initialPwd);
+      expect(reLogin.status).toBe(200);
+    });
+
+    it('新密码 < 8 → 400', async () => {
+      const lg = await login(initialPwd);
+      const res = await request(app.getHttpServer())
+        .post('/auth/change-password')
+        .set('Authorization', `Bearer ${lg.body.accessToken}`)
+        .send({ currentPassword: initialPwd, newPassword: 'short' });
+      expect(res.status).toBe(400);
+    });
+
+    it('成功换密 → 200, 返回新对; 旧 access token 失效; 新密可登录, 旧密不可', async () => {
+      const lgOld = await login(initialPwd);
+      const oldAccess = lgOld.body.accessToken;
+
+      const res = await request(app.getHttpServer())
+        .post('/auth/change-password')
+        .set('Authorization', `Bearer ${oldAccess}`)
+        .send({ currentPassword: initialPwd, newPassword: newPwd });
+      expect(res.status).toBe(200);
+      expect(res.body.accessToken).toBeDefined();
+      expect(res.body.refreshToken).toBeDefined();
+
+      const decodedNew: any = jwt.decode(res.body.accessToken);
+      const decodedOld: any = jwt.decode(oldAccess);
+      expect(decodedNew.ver).toBe(decodedOld.ver + 1);
+
+      const meNew = await request(app.getHttpServer())
+        .get('/auth/me')
+        .set('Authorization', `Bearer ${res.body.accessToken}`);
+      expect(meNew.status).toBe(200);
+
+      const meOld = await request(app.getHttpServer())
+        .get('/auth/me')
+        .set('Authorization', `Bearer ${oldAccess}`);
+      expect(meOld.status).toBe(401);
+
+      const lgWithOld = await login(initialPwd);
+      expect(lgWithOld.status).toBe(401);
+      const lgWithNew = await login(newPwd);
+      expect(lgWithNew.status).toBe(200);
+    });
+  });
 });
