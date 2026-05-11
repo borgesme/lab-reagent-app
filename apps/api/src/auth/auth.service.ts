@@ -63,6 +63,14 @@ export class AuthService {
     };
   }
 
+  async updateMe(userId: string, dto: { name: string }) {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { name: dto.name },
+    });
+    return this.me(userId);
+  }
+
   async refresh(token: string) {
     try {
       const payload = await this.jwt.verifyAsync(token, {

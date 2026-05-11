@@ -181,4 +181,54 @@ describe('Auth', () => {
       expect(res.status).toBe(401);
     });
   });
+
+  describe('PATCH /auth/me', () => {
+    let access: string;
+    beforeAll(async () => {
+      const login = await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({ email: 'admin@lab.local', password: 'admin123' });
+      access = login.body.accessToken;
+    });
+
+    it('未登录 → 401', async () => {
+      const res = await request(app.getHttpServer())
+        .patch('/auth/me')
+        .send({ name: '新名字' });
+      expect(res.status).toBe(401);
+    });
+
+    it('合法 name → 200 且 body.name 更新', async () => {
+      const res = await request(app.getHttpServer())
+        .patch('/auth/me')
+        .set('Authorization', `Bearer ${access}`)
+        .send({ name: '管理员-改' });
+      expect(res.status).toBe(200);
+      expect(res.body.name).toBe('管理员-改');
+      expect(res.body.email).toBe('admin@lab.local');
+    });
+
+    it('空 name → 400', async () => {
+      const res = await request(app.getHttpServer())
+        .patch('/auth/me')
+        .set('Authorization', `Bearer ${access}`)
+        .send({ name: '' });
+      expect(res.status).toBe(400);
+    });
+
+    it('whitelist 拦截多余字段:email/labId/roles 不变', async () => {
+      const res = await request(app.getHttpServer())
+        .patch('/auth/me')
+        .set('Authorization', `Bearer ${access}`)
+        .send({
+          name: '管理员-再改',
+          email: 'pwn@evil.com',
+          labId: 'fake-id',
+          roles: ['PLAIN_USER'],
+        });
+      expect(res.status).toBe(200);
+      expect(res.body.email).toBe('admin@lab.local');
+      expect(res.body.roles).toEqual(expect.arrayContaining(['SYS_ADMIN']));
+    });
+  });
 });
