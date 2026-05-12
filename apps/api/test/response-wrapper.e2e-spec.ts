@@ -2,6 +2,7 @@ import { Test } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
+import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter';
 import { expectOk } from './helpers/expect-ok';
 
 describe('Response wrapper (e2e)', () => {
@@ -16,6 +17,7 @@ describe('Response wrapper (e2e)', () => {
     app.useGlobalPipes(
       new ValidationPipe({ whitelist: true, transform: true }),
     );
+    app.useGlobalFilters(new HttpExceptionFilter());
     await app.init();
   });
 
@@ -28,5 +30,22 @@ describe('Response wrapper (e2e)', () => {
     expectOk(res, (data: any) => {
       expect(data).toHaveProperty('status');
     });
+  });
+
+  it('错误未登录请求 → HTTP 200 + code:401', async () => {
+    const res = await request(app.getHttpServer()).get('/api/v1/auth/me');
+    expect(res.status).toBe(200);
+    expect(res.body.code).toBe(401);
+    expect(res.body.data).toBeNull();
+  });
+
+  it('class-validator 失败 → HTTP 200 + code:400 + msg 拼接', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/api/v1/auth/login')
+      .send({ email: 'not-email', password: '' });
+    expect(res.status).toBe(200);
+    expect(res.body.code).toBe(400);
+    expect(typeof res.body.msg).toBe('string');
+    expect(res.body.msg.length).toBeGreaterThan(0);
   });
 });
