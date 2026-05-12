@@ -2,9 +2,11 @@ import { Test } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
+import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { NotificationsService } from '../src/notifications/notifications.service';
 import { MailerService } from '../src/notifications/mailer.service';
+import { expectOk, expectBizError } from './helpers/expect-ok';
 
 describe('Notifications', () => {
   let app: INestApplication;
@@ -20,6 +22,7 @@ describe('Notifications', () => {
     const mod = await Test.createTestingModule({ imports: [AppModule] }).compile();
     app = mod.createNestApplication();
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    app.useGlobalFilters(new HttpExceptionFilter());
     await app.init();
     prisma = app.get(PrismaService);
     notifications = app.get(NotificationsService);
@@ -33,7 +36,7 @@ describe('Notifications', () => {
     const aLogin = await request(app.getHttpServer())
       .post('/auth/login')
       .send({ email: 'alice-notif@lab.local', password: 'pass1234' });
-    aliceToken = aLogin.body.accessToken;
+    aliceToken = aLogin.body.data.accessToken;
     aliceId = (await prisma.user.findUnique({ where: { email: 'alice-notif@lab.local' } }))!.id;
 
     await request(app.getHttpServer())
@@ -42,7 +45,7 @@ describe('Notifications', () => {
     const bLogin = await request(app.getHttpServer())
       .post('/auth/login')
       .send({ email: 'bob-notif@lab.local', password: 'pass1234' });
-    bobToken = bLogin.body.accessToken;
+    bobToken = bLogin.body.data.accessToken;
     bobId = (await prisma.user.findUnique({ where: { email: 'bob-notif@lab.local' } }))!.id;
   });
 
@@ -66,9 +69,9 @@ describe('Notifications', () => {
     const res = await request(app.getHttpServer())
       .get('/notifications')
       .set('Authorization', `Bearer ${aliceToken}`);
-    expect(res.status).toBe(200);
-    expect(res.body.every((n: any) => n.recipientId === aliceId)).toBe(true);
-    expect(res.body.length).toBeGreaterThanOrEqual(1);
+    const data = expectOk(res);
+    expect(data.every((n: any) => n.recipientId === aliceId)).toBe(true);
+    expect(data.length).toBeGreaterThanOrEqual(1);
   });
 
   it('GET /notifications?unreadOnly=true filters read items', async () => {
@@ -82,7 +85,8 @@ describe('Notifications', () => {
     const res = await request(app.getHttpServer())
       .get('/notifications?unreadOnly=true')
       .set('Authorization', `Bearer ${aliceToken}`);
-    expect(res.body.every((x: any) => x.readAt === null)).toBe(true);
+    const data = expectOk(res);
+    expect(data.every((x: any) => x.readAt === null)).toBe(true);
   });
 
   it('POST /notifications/:id/read marks read and 403 on other user', async () => {
@@ -95,7 +99,7 @@ describe('Notifications', () => {
     const ok = await request(app.getHttpServer())
       .post(`/notifications/${n.id}/read`)
       .set('Authorization', `Bearer ${aliceToken}`);
-    expect(ok.status).toBe(200);
+    expectOk(ok);
     const db = await prisma.notification.findUnique({ where: { id: n.id } });
     expect(db?.readAt).not.toBeNull();
 
@@ -108,7 +112,7 @@ describe('Notifications', () => {
     const denied = await request(app.getHttpServer())
       .post(`/notifications/${n2.id}/read`)
       .set('Authorization', `Bearer ${aliceToken}`);
-    expect(denied.status).toBe(403);
+    expectBizError(denied, 403);
   });
 
   it('POST /notifications/read-all marks all own unread', async () => {
@@ -117,7 +121,7 @@ describe('Notifications', () => {
     const res = await request(app.getHttpServer())
       .post('/notifications/read-all')
       .set('Authorization', `Bearer ${aliceToken}`);
-    expect(res.status).toBe(200);
+    expectOk(res);
     const remaining = await prisma.notification.count({
       where: { recipientId: aliceId, readAt: null },
     });
@@ -158,6 +162,6 @@ describe('Notifications', () => {
 
   it('unauthenticated GET returns 401', async () => {
     const res = await request(app.getHttpServer()).get('/notifications');
-    expect(res.status).toBe(401);
+    expectBizError(res, 401);
   });
 });

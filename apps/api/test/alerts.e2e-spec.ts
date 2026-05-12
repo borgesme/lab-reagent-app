@@ -2,7 +2,9 @@ import { Test } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
+import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { expectOk, expectBizError } from './helpers/expect-ok';
 
 describe('Alerts', () => {
   let app: INestApplication;
@@ -16,6 +18,7 @@ describe('Alerts', () => {
     const mod = await Test.createTestingModule({ imports: [AppModule] }).compile();
     app = mod.createNestApplication();
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    app.useGlobalFilters(new HttpExceptionFilter());
     await app.init();
     prisma = app.get(PrismaService);
 
@@ -38,7 +41,7 @@ describe('Alerts', () => {
     let r = await request(app.getHttpServer())
       .post('/auth/login')
       .send({ email: 'lh-alerts@lab.local', password: 'pass1234' });
-    labHeadToken = r.body.accessToken;
+    labHeadToken = r.body.data.accessToken;
     const u = await prisma.user.findUnique({ where: { email: 'lh-alerts@lab.local' } });
     labHeadId = u!.id;
     await prisma.user.update({ where: { id: labHeadId }, data: { labId: 'lab-default' } });
@@ -47,7 +50,7 @@ describe('Alerts', () => {
     r = await request(app.getHttpServer())
       .post('/auth/login')
       .send({ email: 'lh-alerts@lab.local', password: 'pass1234' });
-    labHeadToken = r.body.accessToken;
+    labHeadToken = r.body.data.accessToken;
 
     await request(app.getHttpServer())
       .post('/auth/register')
@@ -55,7 +58,7 @@ describe('Alerts', () => {
     const pl = await request(app.getHttpServer())
       .post('/auth/login')
       .send({ email: 'plain-alerts@lab.local', password: 'pass1234' });
-    plainToken = pl.body.accessToken;
+    plainToken = pl.body.data.accessToken;
 
     const reagent = await prisma.reagent.upsert({
       where: { id: 'reagent-alerts' },
@@ -76,7 +79,8 @@ describe('Alerts', () => {
         .set('Authorization', `Bearer ${labHeadToken}`)
         .send({ labId: 'lab-default', reagentId, safetyStock: '100', expireWarningDays: 30 });
       expect(res.status).toBe(201);
-      expect(res.body.safetyStock).toBe('100');
+      expect(res.body.code).toBe(200);
+      expect(res.body.data.safetyStock).toBe('100');
     });
 
     it('409 on duplicate (labId, reagentId)', async () => {
@@ -84,7 +88,7 @@ describe('Alerts', () => {
         .post('/lab-reagent-configs')
         .set('Authorization', `Bearer ${labHeadToken}`)
         .send({ labId: 'lab-default', reagentId, safetyStock: '200' });
-      expect(res.status).toBe(409);
+      expectBizError(res, 409);
     });
 
     it('400 on negative safetyStock', async () => {
@@ -92,7 +96,7 @@ describe('Alerts', () => {
         .post('/lab-reagent-configs')
         .set('Authorization', `Bearer ${labHeadToken}`)
         .send({ labId: 'lab-default', reagentId: 'reagent-alerts', safetyStock: '-1' });
-      expect(res.status).toBe(400);
+      expectBizError(res, 400);
     });
 
     it('forbidden for plain user', async () => {
@@ -100,15 +104,15 @@ describe('Alerts', () => {
         .post('/lab-reagent-configs')
         .set('Authorization', `Bearer ${plainToken}`)
         .send({ labId: 'lab-default', reagentId, safetyStock: '1' });
-      expect(res.status).toBe(403);
+      expectBizError(res, 403);
     });
 
     it('GET /lab-reagent-configs returns lab list', async () => {
       const res = await request(app.getHttpServer())
         .get('/lab-reagent-configs?labId=lab-default')
         .set('Authorization', `Bearer ${labHeadToken}`);
-      expect(res.status).toBe(200);
-      expect(res.body.length).toBeGreaterThanOrEqual(1);
+      const data = expectOk(res);
+      expect(data.length).toBeGreaterThanOrEqual(1);
     });
   });
 

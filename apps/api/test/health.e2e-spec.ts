@@ -1,13 +1,17 @@
 import { Test } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
+import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter';
+import { expectOk } from './helpers/expect-ok';
 
 describe('GET /health', () => {
   let app: INestApplication;
   beforeAll(async () => {
     const mod = await Test.createTestingModule({ imports: [AppModule] }).compile();
     app = mod.createNestApplication();
+    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    app.useGlobalFilters(new HttpExceptionFilter());
     await app.init();
   });
   afterAll(async () => {
@@ -16,7 +20,7 @@ describe('GET /health', () => {
 
   it('returns { status: "ok" }', async () => {
     const res = await request(app.getHttpServer()).get('/health');
-    expect(res.status).toBe(200);
-    expect(res.body).toEqual({ status: 'ok' });
+    const data = expectOk(res);
+    expect(data).toEqual({ status: 'ok' });
   });
 });

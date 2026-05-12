@@ -3,7 +3,9 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
+import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { expectOk, expectBizError } from './helpers/expect-ok';
 
 describe('Auth', () => {
   let app: INestApplication;
@@ -14,6 +16,7 @@ describe('Auth', () => {
     const mod = await Test.createTestingModule({ imports: [AppModule] }).compile();
     app = mod.createNestApplication();
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    app.useGlobalFilters(new HttpExceptionFilter());
     await app.init();
     prisma = app.get(PrismaService);
     jwt = app.get(JwtService);
@@ -32,69 +35,66 @@ describe('Auth', () => {
       .post('/auth/register')
       .send({ email: 'alice@lab.local', name: 'Alice', password: 'pass1234' });
     expect(res.status).toBe(201);
-    expect(res.body.user.email).toBe('alice@lab.local');
+    expect(res.body.code).toBe(200);
+    expect(res.body.data.user.email).toBe('alice@lab.local');
   });
 
   it('POST /auth/login returns tokens', async () => {
     const res = await request(app.getHttpServer())
       .post('/auth/login')
       .send({ email: 'alice@lab.local', password: 'pass1234' });
-    expect(res.status).toBe(200);
-    expect(res.body.accessToken).toBeDefined();
-    expect(res.body.refreshToken).toBeDefined();
+    const data = expectOk(res);
+    expect(data.accessToken).toBeDefined();
+    expect(data.refreshToken).toBeDefined();
   });
 
   it('POST /auth/login wrong password returns 401', async () => {
     const res = await request(app.getHttpServer())
       .post('/auth/login')
       .send({ email: 'alice@lab.local', password: 'wrong' });
-    expect(res.status).toBe(401);
+    expectBizError(res, 401);
   });
 
   it('GET /auth/me returns current user with roles', async () => {
     const login = await request(app.getHttpServer())
       .post('/auth/login')
       .send({ email: 'admin@lab.local', password: 'admin123' });
-    expect(login.status).toBe(200);
+    expectOk(login);
     const me = await request(app.getHttpServer())
       .get('/auth/me')
-      .set('Authorization', `Bearer ${login.body.accessToken}`);
-    expect(me.status).toBe(200);
-    expect(me.body).toMatchObject({
+      .set('Authorization', `Bearer ${login.body.data.accessToken}`);
+    expectOk(me, {
       email: 'admin@lab.local',
-      roles: expect.arrayContaining(['SYS_ADMIN']),
+      roles: expect.arrayContaining(['SYS_ADMIN']) as any,
     });
   });
 
   it('GET /auth/me without token returns 401', async () => {
     const me = await request(app.getHttpServer()).get('/auth/me');
-    expect(me.status).toBe(401);
+    expectBizError(me, 401);
   });
 
   it('refresh token rotation: 旧 refresh 用一次后再用应 401', async () => {
     const login = await request(app.getHttpServer())
       .post('/auth/login')
       .send({ email: 'admin@lab.local', password: 'admin123' });
-    const oldRefresh = login.body.refreshToken;
+    const oldRefresh = login.body.data.refreshToken;
 
-    // 第一次 refresh:成功,得新对
     const r1 = await request(app.getHttpServer())
       .post('/auth/refresh')
       .send({ refreshToken: oldRefresh });
-    expect(r1.status).toBe(200);
-    expect(r1.body.refreshToken).not.toBe(oldRefresh);
+    const r1Data = expectOk(r1);
+    expect(r1Data.refreshToken).not.toBe(oldRefresh);
 
-    // 同一旧 refresh 再用一次:应 401
     const r2 = await request(app.getHttpServer())
       .post('/auth/refresh')
       .send({ refreshToken: oldRefresh });
-    expect(r2.status).toBe(401);
+    expectBizError(r2, 401);
 
-    // 新 refresh 仍可用一次
     const r3 = await request(app.getHttpServer())
       .post('/auth/refresh')
-      .send({ refreshToken: r1.body.refreshToken });
-    expect(r3.status).toBe(200);
+      .send({ refreshToken: r1Data.refreshToken });
+    expectOk(r3);
   });
 
   describe('legacy claim 容忍 (JWT_ALLOW_LEGACY_CLAIMS)', () => {
@@ -133,7 +133,7 @@ describe('Auth', () => {
       const res = await request(app.getHttpServer())
         .get('/auth/me')
         .set('Authorization', `Bearer ${token}`);
-      expect(res.status).toBe(401);
+      expectBizError(res, 401);
     });
 
     it('access token 无 ver: env=1 → 200', async () => {
@@ -142,8 +142,8 @@ describe('Auth', () => {
       const res = await request(app.getHttpServer())
         .get('/auth/me')
         .set('Authorization', `Bearer ${token}`);
-      expect(res.status).toBe(200);
-      expect(res.body.email).toBe('admin@lab.local');
+      const data = expectOk(res);
+      expect(data.email).toBe('admin@lab.local');
     });
 
     it('refresh token 无 ver/jti: env=0 → 401', async () => {
@@ -152,7 +152,7 @@ describe('Auth', () => {
       const res = await request(app.getHttpServer())
         .post('/auth/refresh')
         .send({ refreshToken: token });
-      expect(res.status).toBe(401);
+      expectBizError(res, 401);
     });
 
     it('refresh token 无 ver/jti: env=1 → 200,换发新对带 ver 与 jti', async () => {
@@ -161,10 +161,10 @@ describe('Auth', () => {
       const res = await request(app.getHttpServer())
         .post('/auth/refresh')
         .send({ refreshToken: token });
-      expect(res.status).toBe(200);
-      const decoded: any = jwt.decode(res.body.accessToken);
+      const data = expectOk(res);
+      const decoded: any = jwt.decode(data.accessToken);
       expect(decoded.ver).toBeDefined();
-      const decodedR: any = jwt.decode(res.body.refreshToken);
+      const decodedR: any = jwt.decode(data.refreshToken);
       expect(decodedR.ver).toBeDefined();
       expect(decodedR.jti).toBeDefined();
     });
@@ -178,7 +178,7 @@ describe('Auth', () => {
       const res = await request(app.getHttpServer())
         .get('/auth/me')
         .set('Authorization', `Bearer ${bogus}`);
-      expect(res.status).toBe(401);
+      expectBizError(res, 401);
     });
   });
 
@@ -188,14 +188,14 @@ describe('Auth', () => {
       const login = await request(app.getHttpServer())
         .post('/auth/login')
         .send({ email: 'admin@lab.local', password: 'admin123' });
-      access = login.body.accessToken;
+      access = login.body.data.accessToken;
     });
 
     it('未登录 → 401', async () => {
       const res = await request(app.getHttpServer())
         .patch('/auth/me')
         .send({ name: '新名字' });
-      expect(res.status).toBe(401);
+      expectBizError(res, 401);
     });
 
     it('合法 name → 200 且 body.name 更新', async () => {
@@ -203,9 +203,9 @@ describe('Auth', () => {
         .patch('/auth/me')
         .set('Authorization', `Bearer ${access}`)
         .send({ name: '管理员-改' });
-      expect(res.status).toBe(200);
-      expect(res.body.name).toBe('管理员-改');
-      expect(res.body.email).toBe('admin@lab.local');
+      const data = expectOk(res);
+      expect(data.name).toBe('管理员-改');
+      expect(data.email).toBe('admin@lab.local');
     });
 
     it('空 name → 400', async () => {
@@ -213,7 +213,7 @@ describe('Auth', () => {
         .patch('/auth/me')
         .set('Authorization', `Bearer ${access}`)
         .send({ name: '' });
-      expect(res.status).toBe(400);
+      expectBizError(res, 400);
     });
 
     it('whitelist 拦截多余字段:email/labId/roles 不变', async () => {
@@ -226,9 +226,9 @@ describe('Auth', () => {
           labId: 'fake-id',
           roles: ['PLAIN_USER'],
         });
-      expect(res.status).toBe(200);
-      expect(res.body.email).toBe('admin@lab.local');
-      expect(res.body.roles).toEqual(expect.arrayContaining(['SYS_ADMIN']));
+      const data = expectOk(res);
+      expect(data.email).toBe('admin@lab.local');
+      expect(data.roles).toEqual(expect.arrayContaining(['SYS_ADMIN']));
     });
   });
 
@@ -243,6 +243,7 @@ describe('Auth', () => {
         .post('/auth/register')
         .send({ email: userEmail, name: 'PwdTest', password: initialPwd });
       expect(reg.status).toBe(201);
+      expect(reg.body.code).toBe(200);
     });
 
     async function login(password: string) {
@@ -253,55 +254,55 @@ describe('Auth', () => {
 
     it('当前密码错 → 401, 密码不变', async () => {
       const lg = await login(initialPwd);
-      expect(lg.status).toBe(200);
+      expectOk(lg);
       const res = await request(app.getHttpServer())
         .post('/auth/change-password')
-        .set('Authorization', `Bearer ${lg.body.accessToken}`)
+        .set('Authorization', `Bearer ${lg.body.data.accessToken}`)
         .send({ currentPassword: 'wrong', newPassword: newPwd });
-      expect(res.status).toBe(401);
+      expectBizError(res, 401);
       const reLogin = await login(initialPwd);
-      expect(reLogin.status).toBe(200);
+      expectOk(reLogin);
     });
 
     it('新密码 < 8 → 400', async () => {
       const lg = await login(initialPwd);
       const res = await request(app.getHttpServer())
         .post('/auth/change-password')
-        .set('Authorization', `Bearer ${lg.body.accessToken}`)
+        .set('Authorization', `Bearer ${lg.body.data.accessToken}`)
         .send({ currentPassword: initialPwd, newPassword: 'short' });
-      expect(res.status).toBe(400);
+      expectBizError(res, 400);
     });
 
     it('成功换密 → 200, 返回新对; 旧 access token 失效; 新密可登录, 旧密不可', async () => {
       const lgOld = await login(initialPwd);
-      const oldAccess = lgOld.body.accessToken;
+      const oldAccess = lgOld.body.data.accessToken;
 
       const res = await request(app.getHttpServer())
         .post('/auth/change-password')
         .set('Authorization', `Bearer ${oldAccess}`)
         .send({ currentPassword: initialPwd, newPassword: newPwd });
-      expect(res.status).toBe(200);
-      expect(res.body.accessToken).toBeDefined();
-      expect(res.body.refreshToken).toBeDefined();
+      const data = expectOk(res);
+      expect(data.accessToken).toBeDefined();
+      expect(data.refreshToken).toBeDefined();
 
-      const decodedNew: any = jwt.decode(res.body.accessToken);
+      const decodedNew: any = jwt.decode(data.accessToken);
       const decodedOld: any = jwt.decode(oldAccess);
       expect(decodedNew.ver).toBe(decodedOld.ver + 1);
 
       const meNew = await request(app.getHttpServer())
         .get('/auth/me')
-        .set('Authorization', `Bearer ${res.body.accessToken}`);
-      expect(meNew.status).toBe(200);
+        .set('Authorization', `Bearer ${data.accessToken}`);
+      expectOk(meNew);
 
       const meOld = await request(app.getHttpServer())
         .get('/auth/me')
         .set('Authorization', `Bearer ${oldAccess}`);
-      expect(meOld.status).toBe(401);
+      expectBizError(meOld, 401);
 
       const lgWithOld = await login(initialPwd);
-      expect(lgWithOld.status).toBe(401);
+      expectBizError(lgWithOld, 401);
       const lgWithNew = await login(newPwd);
-      expect(lgWithNew.status).toBe(200);
+      expectOk(lgWithNew);
     });
   });
 });

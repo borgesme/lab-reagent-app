@@ -2,7 +2,9 @@ import { Test } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
+import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { expectOk, expectBizError } from './helpers/expect-ok';
 
 describe('Users', () => {
   let app: INestApplication;
@@ -13,6 +15,7 @@ describe('Users', () => {
     const mod = await Test.createTestingModule({ imports: [AppModule] }).compile();
     app = mod.createNestApplication();
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    app.useGlobalFilters(new HttpExceptionFilter());
     await app.init();
     prisma = app.get(PrismaService);
     await prisma.userRole.deleteMany({
@@ -24,7 +27,7 @@ describe('Users', () => {
     const r = await request(app.getHttpServer())
       .post('/auth/login')
       .send({ email: 'admin@lab.local', password: 'admin123' });
-    adminToken = r.body.accessToken;
+    adminToken = r.body.data.accessToken;
   });
 
   afterAll(async () => {
@@ -42,15 +45,16 @@ describe('Users', () => {
         roles: ['PLAIN_USER'],
       });
     expect(r.status).toBe(201);
-    expect(r.body.email).toBe('bob@lab.local');
+    expect(r.body.code).toBe(200);
+    expect(r.body.data.email).toBe('bob@lab.local');
   });
 
   it('admin lists users', async () => {
     const r = await request(app.getHttpServer())
       .get('/users')
       .set('Authorization', `Bearer ${adminToken}`);
-    expect(r.status).toBe(200);
-    expect(Array.isArray(r.body)).toBe(true);
+    const data = expectOk(r);
+    expect(Array.isArray(data)).toBe(true);
   });
 
   it('non-admin cannot list', async () => {
@@ -62,21 +66,20 @@ describe('Users', () => {
       .send({ email: 'carol@lab.local', password: 'pass1234' });
     const r = await request(app.getHttpServer())
       .get('/users')
-      .set('Authorization', `Bearer ${login.body.accessToken}`);
-    expect(r.status).toBe(403);
+      .set('Authorization', `Bearer ${login.body.data.accessToken}`);
+    expectBizError(r, 403);
   });
 
   it('reset-password 后旧 access token 立即 401', async () => {
     const loginRes = await request(app.getHttpServer())
       .post('/auth/login')
       .send({ email: 'bob@lab.local', password: 'pass1234' });
-    expect(loginRes.status).toBe(200);
-    const bobToken = loginRes.body.accessToken;
+    const bobToken = expectOk(loginRes).accessToken;
 
     const me1 = await request(app.getHttpServer())
       .get('/auth/me')
       .set('Authorization', `Bearer ${bobToken}`);
-    expect(me1.status).toBe(200);
+    expectOk(me1);
 
     const bob = await prisma.user.findUnique({
       where: { email: 'bob@lab.local' },
@@ -86,12 +89,12 @@ describe('Users', () => {
     const reset = await request(app.getHttpServer())
       .post(`/users/${bob!.id}/reset-password`)
       .set('Authorization', `Bearer ${adminToken}`);
-    expect(reset.status).toBe(200);
+    expectOk(reset);
 
     const me2 = await request(app.getHttpServer())
       .get('/auth/me')
       .set('Authorization', `Bearer ${bobToken}`);
-    expect(me2.status).toBe(401);
+    expectBizError(me2, 401);
   });
 
   it('admin patches user name + roles', async () => {
@@ -103,8 +106,8 @@ describe('Users', () => {
       .patch(`/users/${bob!.id}`)
       .set('Authorization', `Bearer ${adminToken}`)
       .send({ name: 'Bob Renamed', roles: ['LAB_HEAD'] });
-    expect(r.status).toBe(200);
-    expect(r.body.name).toBe('Bob Renamed');
+    const data = expectOk(r);
+    expect(data.name).toBe('Bob Renamed');
 
     const fresh = await prisma.user.findUnique({
       where: { id: bob!.id },
@@ -118,7 +121,7 @@ describe('Users', () => {
       .patch('/users/non-existent-id')
       .set('Authorization', `Bearer ${adminToken}`)
       .send({ name: 'X' });
-    expect(r.status).toBe(404);
+    expectBizError(r, 404);
   });
 
   it('admin deletes(soft) user', async () => {
@@ -132,12 +135,13 @@ describe('Users', () => {
         roles: ['PLAIN_USER'],
       });
     expect(r.status).toBe(201);
-    const erinId = r.body.id;
+    expect(r.body.code).toBe(200);
+    const erinId = r.body.data.id;
 
     const del = await request(app.getHttpServer())
       .delete(`/users/${erinId}`)
       .set('Authorization', `Bearer ${adminToken}`);
-    expect(del.status).toBe(200);
+    expectOk(del);
 
     const erin = await prisma.user.findUnique({ where: { id: erinId } });
     expect(erin?.deletedAt).not.toBeNull();
@@ -145,7 +149,8 @@ describe('Users', () => {
     const list = await request(app.getHttpServer())
       .get('/users')
       .set('Authorization', `Bearer ${adminToken}`);
-    expect(list.body.find((u: any) => u.id === erinId)).toBeUndefined();
+    const listData = expectOk(list);
+    expect(listData.find((u: any) => u.id === erinId)).toBeUndefined();
 
     await prisma.userRole.deleteMany({ where: { userId: erinId } });
     await prisma.user.delete({ where: { id: erinId } });
@@ -158,14 +163,14 @@ describe('Users', () => {
     const r = await request(app.getHttpServer())
       .post(`/users/${bob!.id}/reset-password`)
       .set('Authorization', `Bearer ${adminToken}`);
-    expect(r.status).toBe(200);
-    expect(r.body.tempPassword).toMatch(/^[A-Za-z]{4}[0-9]{4}$/);
+    const data = expectOk(r);
+    expect(data.tempPassword).toMatch(/^[A-Za-z]{4}[0-9]{4}$/);
   });
 
   it('reset-password 不存在用户 → 404', async () => {
     const r = await request(app.getHttpServer())
       .post('/users/non-existent-id/reset-password')
       .set('Authorization', `Bearer ${adminToken}`);
-    expect(r.status).toBe(404);
+    expectBizError(r, 404);
   });
 });
