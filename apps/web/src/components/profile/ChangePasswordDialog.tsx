@@ -70,15 +70,20 @@ export function ChangePasswordDialog({
         newPassword: values.newPassword,
       }),
     });
-    if (res.status === 401) {
-      form.setError('currentPassword', { message: '当前密码不正确' });
-      return;
-    }
     if (!res.ok) {
       toast.error(`修改失败 (${res.status})`);
       return;
     }
-    const data = (await res.json()) as AuthTokens;
+    const body = await res.json();
+    if (body.code === 401) {
+      form.setError('currentPassword', { message: '当前密码不正确' });
+      return;
+    }
+    if (body.code !== 200) {
+      toast.error(body.msg ?? '修改失败');
+      return;
+    }
+    const data = body.data as AuthTokens;
     setTokens(data);
     toast.success('密码已修改，其他设备需要重新登录');
     form.reset();

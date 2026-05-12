@@ -56,9 +56,13 @@ describe('ChangePasswordDialog', () => {
 
   it('成功 → 调 setTokens 与 onOpenChange(false), 显示 toast', async () => {
     const user = userEvent.setup();
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(json({ accessToken: 'a2', refreshToken: 'r2' }));
+    const fetchMock = vi.fn().mockResolvedValueOnce(
+      json({
+        code: 200,
+        msg: 'ok',
+        data: { accessToken: 'a2', refreshToken: 'r2' },
+      }),
+    );
     vi.stubGlobal('fetch', fetchMock);
     const onOpenChange = vi.fn();
     render(<ChangePasswordDialog open onOpenChange={onOpenChange} />);
@@ -76,9 +80,9 @@ describe('ChangePasswordDialog', () => {
 
   it('401 → 当前密码错字段错误', async () => {
     const user = userEvent.setup();
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(new Response('unauth', { status: 401 }));
+    const fetchMock = vi.fn().mockResolvedValueOnce(
+      json({ code: 401, msg: 'invalid current password', data: null }),
+    );
     vi.stubGlobal('fetch', fetchMock);
     render(<ChangePasswordDialog open onOpenChange={vi.fn()} />);
     await user.type(screen.getByTestId('pwd-current'), 'wrong');

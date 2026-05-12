@@ -19,7 +19,9 @@ export async function tryRefresh(): Promise<string | null> {
         body: JSON.stringify({ refreshToken }),
       });
       if (!res.ok) return null;
-      const data = (await res.json()) as AuthTokens;
+      const body = await res.json();
+      if (body?.code !== 200) return null;
+      const data = body.data as AuthTokens;
       if (!useAuth.getState().tokens) return null;
       useAuth.getState().setTokens(data);
       return data.accessToken;
@@ -71,13 +73,23 @@ export async function apiFetchRaw(
   };
 
   let res = await doFetch(opts.token);
-  if (res.status === 401 && opts.token) {
-    const newToken = await tryRefresh();
-    if (newToken) {
-      res = await doFetch(newToken);
-    } else {
-      useAuth.getState().clear();
-      if (typeof window !== 'undefined') window.location.href = '/login';
+  if (opts.token && res.status === 200) {
+    const ct = res.headers.get('content-type') ?? '';
+    if (ct.includes('application/json')) {
+      const peek = await res
+        .clone()
+        .json()
+        .catch(() => null as any);
+      if (peek?.code === 401) {
+        const newToken = await tryRefresh();
+        if (newToken) {
+          res = await doFetch(newToken);
+        } else {
+          useAuth.getState().clear();
+          if (typeof window !== 'undefined')
+            window.location.href = '/login';
+        }
+      }
     }
   }
   return res;

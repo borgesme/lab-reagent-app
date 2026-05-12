@@ -43,11 +43,15 @@ describe('ProfileSheet', () => {
     const user = userEvent.setup();
     const fetchMock = vi.fn().mockResolvedValueOnce(
       json({
-        id: 'u1',
-        email: 'admin@lab.local',
-        name: '新名字',
-        labId: 'lab-1',
-        roles: ['SYS_ADMIN', 'LAB_HEAD'],
+        code: 200,
+        msg: 'ok',
+        data: {
+          id: 'u1',
+          email: 'admin@lab.local',
+          name: '新名字',
+          labId: 'lab-1',
+          roles: ['SYS_ADMIN', 'LAB_HEAD'],
+        },
       }),
     );
     vi.stubGlobal('fetch', fetchMock);

@@ -48,11 +48,30 @@ describe('apiFetch', () => {
     await expect(apiFetch('/x')).rejects.toBeInstanceOf(ApiError);
   });
 
+  it('body.code=401 触发 tryRefresh, refresh 成功后用新 token 重试', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        json({ code: 401, msg: 'expired', data: null }),
+      )
+      .mockResolvedValueOnce(
+        wrap({ accessToken: 'new', refreshToken: 'r2' }),
+      )
+      .mockResolvedValueOnce(wrap({ ok: true }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const r = await apiFetch<{ ok: boolean }>('/me', { token: 'old' });
+    expect(r).toEqual({ ok: true });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    const lastCall = fetchMock.mock.calls[2][1] as RequestInit;
+    expect((lastCall.headers as any).Authorization).toBe('Bearer new');
+  });
+
   it('401 → refresh 200 → retry 200 → 返回 data', async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce(new Response('unauth', { status: 401 }))
-      .mockResolvedValueOnce(json({ accessToken: 'a2', refreshToken: 'r2' }))
+      .mockResolvedValueOnce(json({ code: 401, msg: 'unauth', data: null }))
+      .mockResolvedValueOnce(wrap({ accessToken: 'a2', refreshToken: 'r2' }))
       .mockResolvedValueOnce(wrap({ ok: true }));
     vi.stubGlobal('fetch', fetchMock);
 
@@ -67,8 +86,10 @@ describe('apiFetch', () => {
   it('401 → refresh 401 → clear store 并跳转 /login', async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce(new Response('unauth', { status: 401 }))
-      .mockResolvedValueOnce(new Response('refresh failed', { status: 401 }));
+      .mockResolvedValueOnce(json({ code: 401, msg: 'unauth', data: null }))
+      .mockResolvedValueOnce(
+        json({ code: 401, msg: 'refresh failed', data: null }),
+      );
     vi.stubGlobal('fetch', fetchMock);
     const hrefSetter = vi.fn();
     Object.defineProperty(window, 'location', {
@@ -92,10 +113,11 @@ describe('apiFetch', () => {
     let bizCallCount = 0;
     const fetchMock = vi.fn(async (url: string) => {
       if (url.endsWith('/auth/refresh'))
-        return json({ accessToken: 'a2', refreshToken: 'r2' });
+        return wrap({ accessToken: 'a2', refreshToken: 'r2' });
       bizCallCount++;
-      if (bizCallCount <= 2) return new Response('u', { status: 401 });
-      return json({ ok: true });
+      if (bizCallCount <= 2)
+        return json({ code: 401, msg: 'u', data: null });
+      return wrap({ ok: true });
     });
     vi.stubGlobal('fetch', fetchMock);
 
@@ -113,9 +135,9 @@ describe('apiFetch', () => {
     const fetchMock = vi.fn(async (url: string) => {
       if (url.endsWith('/auth/refresh')) {
         useAuth.getState().clear();
-        return json({ accessToken: 'a2', refreshToken: 'r2' });
+        return wrap({ accessToken: 'a2', refreshToken: 'r2' });
       }
-      return new Response('u', { status: 401 });
+      return json({ code: 401, msg: 'u', data: null });
     });
     vi.stubGlobal('fetch', fetchMock);
     Object.defineProperty(window, 'location', {
