@@ -1,5 +1,6 @@
-import type { AuthTokens } from '@app/shared';
+import type { ApiResponse, AuthTokens } from '@app/shared';
 import { useAuth } from './auth-store';
+import { ApiError } from './api-error';
 
 export const apiBaseUrl =
   process.env.NEXT_PUBLIC_API_BASE ?? 'http://localhost:3001/api/v1';
@@ -87,6 +88,9 @@ export async function apiFetch<T = any>(
   opts: ApiFetchOpts = {},
 ): Promise<T> {
   const res = await apiFetchRaw(path, opts);
-  if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`);
-  return res.status === 204 ? (undefined as T) : res.json();
+  if (!res.ok) throw new ApiError(res.status, `HTTP ${res.status}`);
+  if (res.status === 204) return undefined as T;
+  const body = (await res.json()) as ApiResponse<T>;
+  if (body.code === 200) return body.data as T;
+  throw new ApiError(body.code, body.msg);
 }
