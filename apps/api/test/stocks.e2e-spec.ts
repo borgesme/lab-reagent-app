@@ -2,7 +2,9 @@ import { Test } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
+import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { expectOk, expectBizError } from './helpers/expect-ok';
 
 describe('Stocks', () => {
   let app: INestApplication;
@@ -14,6 +16,7 @@ describe('Stocks', () => {
     const mod = await Test.createTestingModule({ imports: [AppModule] }).compile();
     app = mod.createNestApplication();
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    app.useGlobalFilters(new HttpExceptionFilter());
     await app.init();
     prisma = app.get(PrismaService);
     await prisma.reagentStock.deleteMany({
@@ -23,7 +26,7 @@ describe('Stocks', () => {
     const r = await request(app.getHttpServer())
       .post('/auth/login')
       .send({ email: 'admin@lab.local', password: 'admin123' });
-    adminToken = r.body.accessToken;
+    adminToken = r.body.data.accessToken;
 
     const reagent = await prisma.reagent.upsert({
       where: { id: 'reagent-test-stock' },
@@ -55,38 +58,39 @@ describe('Stocks', () => {
         location: 'A-柜-1层',
       });
     expect(r.status).toBe(201);
-    expect(r.body.batchNo).toBe('TestBatch-001');
-    expect(r.body.reagentId).toBe(reagentId);
+    expect(r.body.code).toBe(200);
+    expect(r.body.data.batchNo).toBe('TestBatch-001');
+    expect(r.body.data.reagentId).toBe(reagentId);
   });
 
   it('list stocks', async () => {
     const r = await request(app.getHttpServer())
       .get('/stocks')
       .set('Authorization', `Bearer ${adminToken}`);
-    expect(r.status).toBe(200);
-    expect(Array.isArray(r.body)).toBe(true);
-    expect(r.body.length).toBeGreaterThanOrEqual(1);
+    const data = expectOk(r);
+    expect(Array.isArray(data)).toBe(true);
+    expect(data.length).toBeGreaterThanOrEqual(1);
   });
 
   it('filter by reagentId', async () => {
     const r = await request(app.getHttpServer())
       .get(`/stocks?reagentId=${reagentId}`)
       .set('Authorization', `Bearer ${adminToken}`);
-    expect(r.status).toBe(200);
-    expect(r.body.every((s: any) => s.reagentId === reagentId)).toBe(true);
+    const data = expectOk(r);
+    expect(data.every((s: any) => s.reagentId === reagentId)).toBe(true);
   });
 
   it('update stock qty', async () => {
     const list = await request(app.getHttpServer())
       .get(`/stocks?reagentId=${reagentId}`)
       .set('Authorization', `Bearer ${adminToken}`);
-    const stockId = list.body[0].id;
+    const stockId = list.body.data[0].id;
     const r = await request(app.getHttpServer())
       .patch(`/stocks/${stockId}`)
       .set('Authorization', `Bearer ${adminToken}`)
       .send({ currentQty: '480', location: 'A-柜-2层' });
-    expect(r.status).toBe(200);
-    expect(r.body.location).toBe('A-柜-2层');
+    const data = expectOk(r);
+    expect(data.location).toBe('A-柜-2层');
   });
 
   it('plain user cannot create stock', async () => {
@@ -102,7 +106,7 @@ describe('Stocks', () => {
       .send({ email: 'plain-p2-stock@lab.local', password: 'pass1234' });
     const r = await request(app.getHttpServer())
       .post('/stocks')
-      .set('Authorization', `Bearer ${login.body.accessToken}`)
+      .set('Authorization', `Bearer ${login.body.data.accessToken}`)
       .send({
         reagentId,
         labId: 'lab-default',
@@ -110,6 +114,6 @@ describe('Stocks', () => {
         currentQty: '100',
         unit: 'g',
       });
-    expect(r.status).toBe(403);
+    expectBizError(r, 403);
   });
 });

@@ -2,7 +2,9 @@ import { Test } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
+import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { expectOk, expectBizError } from './helpers/expect-ok';
 
 describe('Purchases', () => {
   let app: INestApplication;
@@ -20,6 +22,7 @@ describe('Purchases', () => {
     const mod = await Test.createTestingModule({ imports: [AppModule] }).compile();
     app = mod.createNestApplication();
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    app.useGlobalFilters(new HttpExceptionFilter());
     await app.init();
     prisma = app.get(PrismaService);
 
@@ -47,7 +50,7 @@ describe('Purchases', () => {
     const aLogin = await request(app.getHttpServer())
       .post('/auth/login')
       .send({ email: 'admin@lab.local', password: 'admin123' });
-    adminToken = aLogin.body.accessToken;
+    adminToken = aLogin.body.data.accessToken;
 
     async function registerAndLogin(email: string, name: string) {
       await request(app.getHttpServer())
@@ -57,7 +60,7 @@ describe('Purchases', () => {
         .post('/auth/login')
         .send({ email, password: 'pass1234' });
       const u = await prisma.user.findUnique({ where: { email } });
-      return { token: r.body.accessToken as string, id: u!.id };
+      return { token: r.body.data.accessToken as string, id: u!.id };
     }
 
     const lh = await registerAndLogin('lh-p5@lab.local', 'LabHead');
@@ -102,11 +105,11 @@ describe('Purchases', () => {
     const lhRe = await request(app.getHttpServer())
       .post('/auth/login')
       .send({ email: 'lh-p5@lab.local', password: 'pass1234' });
-    labHeadToken = lhRe.body.accessToken;
+    labHeadToken = lhRe.body.data.accessToken;
     const raRe = await request(app.getHttpServer())
       .post('/auth/login')
       .send({ email: 'ra-p5@lab.local', password: 'pass1234' });
-    reagentAdminToken = raRe.body.accessToken;
+    reagentAdminToken = raRe.body.data.accessToken;
   });
 
   afterAll(async () => {
@@ -120,9 +123,10 @@ describe('Purchases', () => {
         .set('Authorization', `Bearer ${plainToken}`)
         .send({ reagentId, quantity: '500', unit: 'mL', reason: '实验需要' });
       expect(res.status).toBe(201);
-      expect(res.body.status).toBe('PENDING');
-      expect(res.body.applicantId).toBe(plainId);
-      expect(res.body.labId).toBe('lab-default');
+      expect(res.body.code).toBe(200);
+      expect(res.body.data.status).toBe('PENDING');
+      expect(res.body.data.applicantId).toBe(plainId);
+      expect(res.body.data.labId).toBe('lab-default');
     });
 
     it('rejects when quantity is non-positive', async () => {
@@ -130,7 +134,7 @@ describe('Purchases', () => {
         .post('/purchases')
         .set('Authorization', `Bearer ${plainToken}`)
         .send({ reagentId, quantity: '0', unit: 'mL', reason: '测试' });
-      expect(res.status).toBe(400);
+      expectBizError(res, 400);
     });
 
     it('rejects when user has no lab', async () => {
@@ -142,9 +146,9 @@ describe('Purchases', () => {
         .send({ email: 'nolab-p5@lab.local', password: 'pass1234' });
       const res = await request(app.getHttpServer())
         .post('/purchases')
-        .set('Authorization', `Bearer ${login.body.accessToken}`)
+        .set('Authorization', `Bearer ${login.body.data.accessToken}`)
         .send({ reagentId, quantity: '1', unit: 'mL', reason: 't' });
-      expect(res.status).toBe(403);
+      expectBizError(res, 403);
     });
   });
 
@@ -153,23 +157,23 @@ describe('Purchases', () => {
       const res = await request(app.getHttpServer())
         .get('/purchases/mine')
         .set('Authorization', `Bearer ${plainToken}`);
-      expect(res.status).toBe(200);
-      expect(res.body.every((p: any) => p.applicantId === plainId)).toBe(true);
+      const data = expectOk(res);
+      expect(data.every((p: any) => p.applicantId === plainId)).toBe(true);
     });
 
     it('GET /purchases returns lab list for REAGENT_ADMIN', async () => {
       const res = await request(app.getHttpServer())
         .get('/purchases')
         .set('Authorization', `Bearer ${reagentAdminToken}`);
-      expect(res.status).toBe(200);
-      expect(res.body.every((p: any) => p.labId === 'lab-default')).toBe(true);
+      const data = expectOk(res);
+      expect(data.every((p: any) => p.labId === 'lab-default')).toBe(true);
     });
 
     it('GET /purchases forbidden for plain user', async () => {
       const res = await request(app.getHttpServer())
         .get('/purchases')
         .set('Authorization', `Bearer ${plainToken}`);
-      expect(res.status).toBe(403);
+      expectBizError(res, 403);
     });
   });
 
@@ -179,11 +183,11 @@ describe('Purchases', () => {
         .post('/purchases')
         .set('Authorization', `Bearer ${plainToken}`)
         .send({ reagentId, quantity: '10', unit: 'mL', reason: 'cancel test' });
-      const id = create.body.id;
+      const id = create.body.data.id;
       const res = await request(app.getHttpServer())
         .post(`/purchases/${id}/cancel`)
         .set('Authorization', `Bearer ${plainToken}`);
-      expect(res.status).toBe(200);
+      expectOk(res);
       const db = await prisma.purchaseRequest.findUnique({ where: { id } });
       expect(db?.status).toBe('CANCELLED');
     });
@@ -193,7 +197,7 @@ describe('Purchases', () => {
         .post('/purchases')
         .set('Authorization', `Bearer ${plainToken}`)
         .send({ reagentId, quantity: '10', unit: 'mL', reason: 'merge then cancel' });
-      const id = create.body.id;
+      const id = create.body.data.id;
       await prisma.purchaseRequest.update({
         where: { id },
         data: { status: 'MERGED' },
@@ -201,7 +205,7 @@ describe('Purchases', () => {
       const res = await request(app.getHttpServer())
         .post(`/purchases/${id}/cancel`)
         .set('Authorization', `Bearer ${plainToken}`);
-      expect(res.status).toBe(409);
+      expectBizError(res, 409);
     });
   });
 
@@ -211,7 +215,7 @@ describe('Purchases', () => {
         .post('/purchases')
         .set('Authorization', `Bearer ${plainToken}`)
         .send({ reagentId, quantity: qty, unit: 'mL', reason: 'merge' });
-      return res.body.id as string;
+      return res.body.data.id as string;
     }
 
     it('rejects empty requestIds', async () => {
@@ -219,7 +223,7 @@ describe('Purchases', () => {
         .post('/purchases/batches')
         .set('Authorization', `Bearer ${reagentAdminToken}`)
         .send({ requestIds: [] });
-      expect(res.status).toBe(400);
+      expectBizError(res, 400);
     });
 
     it('forbidden for LAB_HEAD', async () => {
@@ -228,7 +232,7 @@ describe('Purchases', () => {
         .post('/purchases/batches')
         .set('Authorization', `Bearer ${labHeadToken}`)
         .send({ requestIds: [id] });
-      expect(res.status).toBe(403);
+      expectBizError(res, 403);
     });
 
     it('409 when any request not PENDING', async () => {
@@ -241,7 +245,7 @@ describe('Purchases', () => {
         .post('/purchases/batches')
         .set('Authorization', `Bearer ${reagentAdminToken}`)
         .send({ requestIds: [id] });
-      expect(res.status).toBe(409);
+      expectBizError(res, 409);
     });
 
     it('400 when reagent differs', async () => {
@@ -255,12 +259,12 @@ describe('Purchases', () => {
         .post('/purchases')
         .set('Authorization', `Bearer ${plainToken}`)
         .send({ reagentId: r2.id, quantity: '1', unit: 'mL', reason: 't' });
-      const b = bRes.body.id;
+      const b = bRes.body.data.id;
       const res = await request(app.getHttpServer())
         .post('/purchases/batches')
         .set('Authorization', `Bearer ${reagentAdminToken}`)
         .send({ requestIds: [a, b] });
-      expect(res.status).toBe(400);
+      expectBizError(res, 400);
     });
 
     it('merges two PENDING requests into a batch', async () => {
@@ -271,15 +275,17 @@ describe('Purchases', () => {
         .set('Authorization', `Bearer ${reagentAdminToken}`)
         .send({ requestIds: [a, b] });
       expect(res.status).toBe(201);
-      expect(res.body.status).toBe('PENDING');
-      expect(Number(res.body.totalQty)).toBe(300);
+      expect(res.body.code).toBe(200);
+      const data = res.body.data;
+      expect(data.status).toBe('PENDING');
+      expect(Number(data.totalQty)).toBe(300);
       const [dbA, dbB] = await Promise.all([
         prisma.purchaseRequest.findUnique({ where: { id: a } }),
         prisma.purchaseRequest.findUnique({ where: { id: b } }),
       ]);
       expect(dbA?.status).toBe('MERGED');
-      expect(dbA?.batchId).toBe(res.body.id);
-      expect(dbB?.batchId).toBe(res.body.id);
+      expect(dbA?.batchId).toBe(data.id);
+      expect(dbB?.batchId).toBe(data.id);
     });
   });
 
@@ -292,8 +298,8 @@ describe('Purchases', () => {
       const m = await request(app.getHttpServer())
         .post('/purchases/batches')
         .set('Authorization', `Bearer ${reagentAdminToken}`)
-        .send({ requestIds: [r.body.id] });
-      return { batchId: m.body.id, requestId: r.body.id };
+        .send({ requestIds: [r.body.data.id] });
+      return { batchId: m.body.data.id as string, requestId: r.body.data.id as string };
     }
 
     it('APPROVE flips batch status and notifies REAGENT_ADMIN', async () => {
@@ -303,7 +309,7 @@ describe('Purchases', () => {
         .post(`/purchases/batches/${batchId}/approve`)
         .set('Authorization', `Bearer ${labHeadToken}`)
         .send({ action: 'APPROVE', comment: 'ok' });
-      expect(res.status).toBe(200);
+      expectOk(res);
       const db = await prisma.purchaseBatch.findUnique({ where: { id: batchId } });
       expect(db?.status).toBe('APPROVED');
       const notif = await prisma.notification.findFirst({
@@ -319,7 +325,7 @@ describe('Purchases', () => {
         .post(`/purchases/batches/${batchId}/approve`)
         .set('Authorization', `Bearer ${labHeadToken}`)
         .send({ action: 'REJECT', comment: '预算不足' });
-      expect(res.status).toBe(200);
+      expectOk(res);
       const b = await prisma.purchaseBatch.findUnique({ where: { id: batchId } });
       expect(b?.status).toBe('REJECTED');
       expect(b?.rejectedReason).toBe('预算不足');
@@ -342,7 +348,7 @@ describe('Purchases', () => {
         .post(`/purchases/batches/${batchId}/approve`)
         .set('Authorization', `Bearer ${labHeadToken}`)
         .send({ action: 'APPROVE' });
-      expect(res.status).toBe(409);
+      expectBizError(res, 409);
     });
 
     it('forbidden for non-lab LAB_HEAD', async () => {
@@ -361,9 +367,9 @@ describe('Purchases', () => {
         .send({ email: 'lh-p5@lab.local', password: 'pass1234' });
       const res = await request(app.getHttpServer())
         .post(`/purchases/batches/${batchId}/approve`)
-        .set('Authorization', `Bearer ${newLogin.body.accessToken}`)
+        .set('Authorization', `Bearer ${newLogin.body.data.accessToken}`)
         .send({ action: 'APPROVE' });
-      expect(res.status).toBe(403);
+      expectBizError(res, 403);
       await prisma.user.update({
         where: { id: labHeadId },
         data: { labId: 'lab-default' },
@@ -380,12 +386,12 @@ describe('Purchases', () => {
       const m = await request(app.getHttpServer())
         .post('/purchases/batches')
         .set('Authorization', `Bearer ${reagentAdminToken}`)
-        .send({ requestIds: [r.body.id] });
+        .send({ requestIds: [r.body.data.id] });
       await request(app.getHttpServer())
-        .post(`/purchases/batches/${m.body.id}/approve`)
+        .post(`/purchases/batches/${m.body.data.id}/approve`)
         .set('Authorization', `Bearer ${labHeadToken}`)
         .send({ action: 'APPROVE' });
-      return m.body.id as string;
+      return m.body.data.id as string;
     }
 
     it('creates ReagentStock and Receipt, notifies applicants', async () => {
@@ -402,10 +408,11 @@ describe('Purchases', () => {
           location: 'A-01',
         });
       expect(res.status).toBe(201);
-      expect(res.body.stockId).toBeDefined();
+      expect(res.body.code).toBe(200);
+      expect(res.body.data.stockId).toBeDefined();
 
       const stock = await prisma.reagentStock.findUnique({
-        where: { id: res.body.stockId },
+        where: { id: res.body.data.stockId },
       });
       expect(stock?.batchNo).toBe('P5RCV-001');
       expect(Number(stock?.initialQty)).toBe(50);
@@ -430,7 +437,7 @@ describe('Purchases', () => {
         .post(`/purchases/batches/${batchId}/receipt`)
         .set('Authorization', `Bearer ${reagentAdminToken}`)
         .send({ actualQty: '1' });
-      expect(res.status).toBe(409);
+      expectBizError(res, 409);
     });
 
     it('409 when batch not APPROVED', async () => {
@@ -441,12 +448,12 @@ describe('Purchases', () => {
       const m = await request(app.getHttpServer())
         .post('/purchases/batches')
         .set('Authorization', `Bearer ${reagentAdminToken}`)
-        .send({ requestIds: [r.body.id] });
+        .send({ requestIds: [r.body.data.id] });
       const res = await request(app.getHttpServer())
-        .post(`/purchases/batches/${m.body.id}/receipt`)
+        .post(`/purchases/batches/${m.body.data.id}/receipt`)
         .set('Authorization', `Bearer ${reagentAdminToken}`)
         .send({ actualQty: '10' });
-      expect(res.status).toBe(409);
+      expectBizError(res, 409);
     });
   });
 });

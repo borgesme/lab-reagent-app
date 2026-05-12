@@ -2,7 +2,9 @@ import { Test } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
+import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { expectOk, expectBizError } from './helpers/expect-ok';
 
 describe('Reagents', () => {
   let app: INestApplication;
@@ -14,6 +16,7 @@ describe('Reagents', () => {
     const mod = await Test.createTestingModule({ imports: [AppModule] }).compile();
     app = mod.createNestApplication();
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    app.useGlobalFilters(new HttpExceptionFilter());
     await app.init();
     prisma = app.get(PrismaService);
     await prisma.purchaseReceipt.deleteMany({});
@@ -29,7 +32,7 @@ describe('Reagents', () => {
     const r1 = await request(app.getHttpServer())
       .post('/auth/login')
       .send({ email: 'admin@lab.local', password: 'admin123' });
-    adminToken = r1.body.accessToken;
+    adminToken = r1.body.data.accessToken;
 
     await request(app.getHttpServer())
       .post('/auth/register')
@@ -37,7 +40,7 @@ describe('Reagents', () => {
     const r2 = await request(app.getHttpServer())
       .post('/auth/login')
       .send({ email: 'plain-p2@lab.local', password: 'pass1234' });
-    plainToken = r2.body.accessToken;
+    plainToken = r2.body.data.accessToken;
   });
 
   afterAll(async () => {
@@ -57,15 +60,16 @@ describe('Reagents', () => {
         hazardLevel: 'DANGEROUS',
       });
     expect(r.status).toBe(201);
-    expect(r.body.name).toBe('TestReagent-Acetone');
+    expect(r.body.code).toBe(200);
+    expect(r.body.data.name).toBe('TestReagent-Acetone');
   });
 
   it('plain user can list reagents', async () => {
     const r = await request(app.getHttpServer())
       .get('/reagents')
       .set('Authorization', `Bearer ${plainToken}`);
-    expect(r.status).toBe(200);
-    expect(r.body.length).toBeGreaterThanOrEqual(1);
+    const data = expectOk(r);
+    expect(data.length).toBeGreaterThanOrEqual(1);
   });
 
   it('plain user cannot create reagent', async () => {
@@ -73,14 +77,14 @@ describe('Reagents', () => {
       .post('/reagents')
       .set('Authorization', `Bearer ${plainToken}`)
       .send({ name: 'TestReagent-X' });
-    expect(r.status).toBe(403);
+    expectBizError(r, 403);
   });
 
   it('search by name', async () => {
     const r = await request(app.getHttpServer())
       .get('/reagents?q=Acetone')
       .set('Authorization', `Bearer ${plainToken}`);
-    expect(r.status).toBe(200);
-    expect(r.body.some((x: any) => x.name.includes('Acetone'))).toBe(true);
+    const data = expectOk(r);
+    expect(data.some((x: any) => x.name.includes('Acetone'))).toBe(true);
   });
 });

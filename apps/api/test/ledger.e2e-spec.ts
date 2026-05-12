@@ -2,7 +2,9 @@ import { Test } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
+import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { expectOk, expectBizError } from './helpers/expect-ok';
 
 describe('Ledger', () => {
   let app: INestApplication;
@@ -14,13 +16,14 @@ describe('Ledger', () => {
     const mod = await Test.createTestingModule({ imports: [AppModule] }).compile();
     app = mod.createNestApplication();
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    app.useGlobalFilters(new HttpExceptionFilter());
     await app.init();
     prisma = app.get(PrismaService);
 
     const aLogin = await request(app.getHttpServer())
       .post('/auth/login')
       .send({ email: 'admin@lab.local', password: 'admin123' });
-    adminToken = aLogin.body.accessToken;
+    adminToken = aLogin.body.data.accessToken;
 
     await request(app.getHttpServer())
       .post('/auth/register')
@@ -32,7 +35,7 @@ describe('Ledger', () => {
     const pLogin = await request(app.getHttpServer())
       .post('/auth/login')
       .send({ email: 'ledger-plain@lab.local', password: 'pass1234' });
-    plainToken = pLogin.body.accessToken;
+    plainToken = pLogin.body.data.accessToken;
   });
 
   afterAll(async () => {
@@ -43,16 +46,16 @@ describe('Ledger', () => {
     const r = await request(app.getHttpServer())
       .get('/controlled-ledger')
       .set('Authorization', `Bearer ${plainToken}`);
-    expect(r.status).toBe(403);
+    expectBizError(r, 403);
   });
 
   it('admin JSON returns only controlled rows', async () => {
     const r = await request(app.getHttpServer())
       .get('/controlled-ledger?format=json')
       .set('Authorization', `Bearer ${adminToken}`);
-    expect(r.status).toBe(200);
-    expect(Array.isArray(r.body)).toBe(true);
-    for (const row of r.body) {
+    const data = expectOk(r);
+    expect(Array.isArray(data)).toBe(true);
+    for (const row of data) {
       expect(['CONTROLLED']).toContain(row.hazardLevel);
     }
   });
@@ -64,7 +67,7 @@ describe('Ledger', () => {
     expect(r.status).toBe(200);
     expect(r.headers['content-type']).toMatch(/text\/csv/);
     expect(r.text.charCodeAt(0)).toBe(0xfeff);
-    const firstLine = r.text.replace(/^\uFEFF/, '').split('\n')[0];
+    const firstLine = r.text.replace(/^﻿/, '').split('\n')[0];
     expect(firstLine).toContain('date');
     expect(firstLine).toContain('reagentName');
     expect(firstLine).toContain('signed');
@@ -74,8 +77,8 @@ describe('Ledger', () => {
     const r = await request(app.getHttpServer())
       .get('/controlled-ledger?format=json&from=2100-01-01&to=2100-12-31')
       .set('Authorization', `Bearer ${adminToken}`);
-    expect(r.status).toBe(200);
-    expect(r.body).toEqual([]);
+    const data = expectOk(r);
+    expect(data).toEqual([]);
   });
 
   describe('snapshots', () => {
@@ -97,8 +100,8 @@ describe('Ledger', () => {
       const r = await request(app.getHttpServer())
         .get('/controlled-ledger/snapshots')
         .set('Authorization', `Bearer ${adminToken}`);
-      expect(r.status).toBe(200);
-      expect(Array.isArray(r.body)).toBe(true);
+      const data = expectOk(r);
+      expect(Array.isArray(data)).toBe(true);
     });
 
     it('GET /controlled-ledger/snapshots/:id returns CSV', async () => {
