@@ -1,4 +1,5 @@
 import { Controller, Get, Query, Req, Res, StreamableFile } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { PurchaseAmountService } from './purchase-amount.service';
 import { PurchaseAmountQueryDto } from './dto/purchase-amount.dto';
@@ -7,12 +8,17 @@ import { exportCsv } from './exporters/csv.exporter';
 import { exportXlsx } from './exporters/xlsx.exporter';
 import type { ResolvedReportScope } from '@app/shared';
 
+@ApiTags('reports')
+@ApiBearerAuth()
 @Controller('reports/purchase-amount')
 @ReportScope('purchase-amount')
 export class PurchaseAmountController {
   constructor(private readonly svc: PurchaseAmountService) {}
 
   @Get()
+  @ApiOperation({
+    summary: '采购金额报表 (groupBy=month/supplier, format=csv/xlsx)',
+  })
   async run(
     @Query() q: PurchaseAmountQueryDto,
     @Req() req: Request & { reportScope: ResolvedReportScope },

@@ -1,4 +1,5 @@
 import { Controller, Get, Query, Req, Res, StreamableFile } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { InventoryTurnoverService } from './inventory-turnover.service';
 import { InventoryTurnoverQueryDto } from './dto/inventory-turnover.dto';
@@ -7,12 +8,17 @@ import { exportCsv } from './exporters/csv.exporter';
 import { exportXlsx } from './exporters/xlsx.exporter';
 import type { ResolvedReportScope } from '@app/shared';
 
+@ApiTags('reports')
+@ApiBearerAuth()
 @Controller('reports/inventory-turnover')
 @ReportScope('inventory-turnover')
 export class InventoryTurnoverController {
   constructor(private readonly svc: InventoryTurnoverService) {}
 
   @Get()
+  @ApiOperation({
+    summary: '库存周转报表 (format=csv/xlsx 走下载, summary=1 仅返回汇总)',
+  })
   async run(
     @Query() q: InventoryTurnoverQueryDto,
     @Req() req: Request & { reportScope: ResolvedReportScope },

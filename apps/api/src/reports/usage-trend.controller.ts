@@ -1,4 +1,5 @@
 import { Controller, Get, Query, Req, Res, StreamableFile } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { UsageTrendService } from './usage-trend.service';
 import { UsageTrendQueryDto } from './dto/usage-trend.dto';
@@ -7,12 +8,17 @@ import { exportCsv } from './exporters/csv.exporter';
 import { exportXlsx } from './exporters/xlsx.exporter';
 import type { ResolvedReportScope } from '@app/shared';
 
+@ApiTags('reports')
+@ApiBearerAuth()
 @Controller('reports/usage-trend')
 @ReportScope('usage-trend')
 export class UsageTrendController {
   constructor(private readonly svc: UsageTrendService) {}
 
   @Get()
+  @ApiOperation({
+    summary: '试剂使用量趋势报表 (groupBy=day/week/month, format=csv/xlsx)',
+  })
   async run(
     @Query() q: UsageTrendQueryDto,
     @Req() req: Request & { reportScope: ResolvedReportScope },

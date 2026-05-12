@@ -1,4 +1,5 @@
 import { Controller, Get, Query, Req, Res, StreamableFile } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { ControlledAuditService } from './controlled-audit.service';
 import { ControlledAuditQueryDto } from './dto/controlled-audit.dto';
@@ -7,12 +8,17 @@ import { exportCsv } from './exporters/csv.exporter';
 import { exportXlsx } from './exporters/xlsx.exporter';
 import type { ResolvedReportScope } from '@app/shared';
 
+@ApiTags('reports')
+@ApiBearerAuth()
 @Controller('reports/controlled-audit')
 @ReportScope('controlled-audit')
 export class ControlledAuditController {
   constructor(private readonly svc: ControlledAuditService) {}
 
   @Get()
+  @ApiOperation({
+    summary: '管制审计报表 (format=csv/xlsx 走下载, summary=1 仅返回汇总)',
+  })
   async run(
     @Query() q: ControlledAuditQueryDto,
     @Req() req: Request & { reportScope: ResolvedReportScope },
