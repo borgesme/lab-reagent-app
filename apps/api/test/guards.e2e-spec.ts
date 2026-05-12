@@ -7,8 +7,10 @@ import {
 } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
+import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter';
 import { Roles } from '../src/common/decorators/roles.decorator';
 import { CurrentUser } from '../src/common/decorators/current-user.decorator';
+import { expectOk, expectBizError } from './helpers/expect-ok';
 
 @Controller('test-admin')
 class TestAdminController {
@@ -30,12 +32,13 @@ describe('Guards', () => {
     }).compile();
     app = mod.createNestApplication();
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    app.useGlobalFilters(new HttpExceptionFilter());
     await app.init();
 
     const res = await request(app.getHttpServer())
       .post('/auth/login')
       .send({ email: 'admin@lab.local', password: 'admin123' });
-    accessToken = res.body.accessToken;
+    accessToken = res.body.data.accessToken;
   });
 
   afterAll(async () => {
@@ -44,14 +47,14 @@ describe('Guards', () => {
 
   it('missing token → 401', async () => {
     const r = await request(app.getHttpServer()).get('/test-admin');
-    expect(r.status).toBe(401);
+    expectBizError(r, 401);
   });
 
   it('admin token → 200', async () => {
     const r = await request(app.getHttpServer())
       .get('/test-admin')
       .set('Authorization', `Bearer ${accessToken}`);
-    expect(r.status).toBe(200);
-    expect(r.body.sub).toBeDefined();
+    const data = expectOk(r);
+    expect(data.sub).toBeDefined();
   });
 });

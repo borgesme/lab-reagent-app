@@ -2,6 +2,8 @@ import { Test } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
+import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter';
+import { expectOk, expectBizError } from './helpers/expect-ok';
 
 describe('Reports (M1 stubs)', () => {
   let app: INestApplication;
@@ -12,12 +14,13 @@ describe('Reports (M1 stubs)', () => {
     const mod = await Test.createTestingModule({ imports: [AppModule] }).compile();
     app = mod.createNestApplication();
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    app.useGlobalFilters(new HttpExceptionFilter());
     await app.init();
 
     const admin = await request(app.getHttpServer())
       .post('/auth/login')
       .send({ email: 'admin@lab.local', password: 'admin123' });
-    adminToken = admin.body.accessToken;
+    adminToken = admin.body.data.accessToken;
 
     await request(app.getHttpServer())
       .post('/auth/register')
@@ -29,7 +32,7 @@ describe('Reports (M1 stubs)', () => {
     const plain = await request(app.getHttpServer())
       .post('/auth/login')
       .send({ email: 'reports-plain@lab.local', password: 'pass1234' });
-    plainToken = plain.body.accessToken;
+    plainToken = plain.body.data.accessToken;
   });
 
   afterAll(async () => {
@@ -47,7 +50,7 @@ describe('Reports (M1 stubs)', () => {
         const r = await request(app.getHttpServer())
           .get(`/reports/${slug}`)
           .set('Authorization', `Bearer ${adminToken}`);
-        expect(r.status).toBe(200);
+        expectOk(r);
       }
     });
 
@@ -55,7 +58,7 @@ describe('Reports (M1 stubs)', () => {
       const ok = await request(app.getHttpServer())
         .get('/reports/usage-trend')
         .set('Authorization', `Bearer ${plainToken}`);
-      expect(ok.status).toBe(200);
+      expectOk(ok);
 
       for (const slug of [
         'inventory-turnover',
@@ -65,8 +68,7 @@ describe('Reports (M1 stubs)', () => {
         const r = await request(app.getHttpServer())
           .get(`/reports/${slug}`)
           .set('Authorization', `Bearer ${plainToken}`);
-        expect(r.status).toBe(403);
-        expect(r.body.code ?? r.body.message?.code).toBe('REPORT_SCOPE_DENIED');
+        expectBizError(r, 403);
       }
     });
   });
@@ -127,30 +129,30 @@ describe('Reports (M1 stubs)', () => {
       const r = await request(app.getHttpServer())
         .get('/reports/usage-trend?range=30d&groupBy=day')
         .set('Authorization', `Bearer ${adminToken}`);
-      expect(r.status).toBe(200);
-      expect(r.body.summary).toMatchObject({
+      const data = expectOk(r);
+      expect(data.summary).toMatchObject({
         totalIssued: expect.any(String),
         distinctReagents: expect.any(Number),
         avgDailyIssued: expect.any(String),
       });
-      expect(Array.isArray(r.body.series)).toBe(true);
-      expect(Number(r.body.summary.totalIssued)).toBeGreaterThan(0);
+      expect(Array.isArray(data.series)).toBe(true);
+      expect(Number(data.summary.totalIssued)).toBeGreaterThan(0);
     });
 
     it('PLAIN_USER scope=self returns only self issues (empty for fresh plain user)', async () => {
       const r = await request(app.getHttpServer())
         .get('/reports/usage-trend?range=30d')
         .set('Authorization', `Bearer ${plainToken}`);
-      expect(r.status).toBe(200);
-      expect(r.body.summary.distinctReagents).toBe(0);
-      expect(r.body.series).toEqual([]);
+      const data = expectOk(r);
+      expect(data.summary.distinctReagents).toBe(0);
+      expect(data.series).toEqual([]);
     });
 
     it('rejects custom range without dates', async () => {
       const r = await request(app.getHttpServer())
         .get('/reports/usage-trend?range=custom')
         .set('Authorization', `Bearer ${adminToken}`);
-      expect(r.status).toBe(400);
+      expectBizError(r, 400);
     });
   });
 
@@ -159,13 +161,13 @@ describe('Reports (M1 stubs)', () => {
       const r = await request(app.getHttpServer())
         .get('/reports/inventory-turnover?range=30d')
         .set('Authorization', `Bearer ${adminToken}`);
-      expect(r.status).toBe(200);
-      expect(r.body.summary).toMatchObject({
+      const data = expectOk(r);
+      expect(data.summary).toMatchObject({
         avgTurnoverDays: expect.any(Number),
         lowStockCount: expect.any(Number),
       });
-      expect(Array.isArray(r.body.rows)).toBe(true);
-      for (const row of r.body.rows) {
+      expect(Array.isArray(data.rows)).toBe(true);
+      for (const row of data.rows) {
         expect(row).toMatchObject({
           reagentId: expect.any(String),
           name: expect.any(String),
@@ -180,14 +182,14 @@ describe('Reports (M1 stubs)', () => {
       const r = await request(app.getHttpServer())
         .get('/reports/inventory-turnover?range=30d')
         .set('Authorization', `Bearer ${adminToken}`);
-      expect(r.status).toBe(200);
+      expectOk(r);
     });
 
     it('PLAIN_USER forbidden', async () => {
       const r = await request(app.getHttpServer())
         .get('/reports/inventory-turnover')
         .set('Authorization', `Bearer ${plainToken}`);
-      expect(r.status).toBe(403);
+      expectBizError(r, 403);
     });
   });
 
@@ -196,14 +198,14 @@ describe('Reports (M1 stubs)', () => {
       const r = await request(app.getHttpServer())
         .get('/reports/purchase-amount?range=365d&groupBy=month')
         .set('Authorization', `Bearer ${adminToken}`);
-      expect(r.status).toBe(200);
-      expect(r.body.summary).toMatchObject({
+      const data = expectOk(r);
+      expect(data.summary).toMatchObject({
         totalAmount: expect.any(String),
         batchCount: expect.any(Number),
         pendingBatchCount: expect.any(Number),
       });
-      expect(Array.isArray(r.body.series)).toBe(true);
-      for (const row of r.body.series) {
+      expect(Array.isArray(data.series)).toBe(true);
+      for (const row of data.series) {
         expect(row.amount).toMatch(/^\d+\.\d{2}$/);
       }
     });
@@ -212,14 +214,14 @@ describe('Reports (M1 stubs)', () => {
       const r = await request(app.getHttpServer())
         .get('/reports/purchase-amount?range=365d&groupBy=supplier')
         .set('Authorization', `Bearer ${adminToken}`);
-      expect(r.status).toBe(200);
+      expectOk(r);
     });
 
     it('PLAIN_USER forbidden', async () => {
       const r = await request(app.getHttpServer())
         .get('/reports/purchase-amount')
         .set('Authorization', `Bearer ${plainToken}`);
-      expect(r.status).toBe(403);
+      expectBizError(r, 403);
     });
   });
 
@@ -228,12 +230,12 @@ describe('Reports (M1 stubs)', () => {
       const r = await request(app.getHttpServer())
         .get('/reports/controlled-audit?range=365d')
         .set('Authorization', `Bearer ${adminToken}`);
-      expect(r.status).toBe(200);
-      expect(r.body.summary).toMatchObject({
+      const data = expectOk(r);
+      expect(data.summary).toMatchObject({
         totalEvents: expect.any(Number),
         distinctActors: expect.any(Number),
       });
-      expect(Array.isArray(r.body.rows)).toBe(true);
+      expect(Array.isArray(data.rows)).toBe(true);
     });
 
     it('SAFETY_OFFICER allowed (scope=all)', async () => {
@@ -241,14 +243,14 @@ describe('Reports (M1 stubs)', () => {
       const r = await request(app.getHttpServer())
         .get('/reports/controlled-audit?range=30d')
         .set('Authorization', `Bearer ${adminToken}`);
-      expect(r.status).toBe(200);
+      expectOk(r);
     });
 
     it('PLAIN_USER forbidden', async () => {
       const r = await request(app.getHttpServer())
         .get('/reports/controlled-audit')
         .set('Authorization', `Bearer ${plainToken}`);
-      expect(r.status).toBe(403);
+      expectBizError(r, 403);
     });
   });
 
