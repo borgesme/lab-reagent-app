@@ -66,6 +66,8 @@ describe('/admin/users page', () => {
         return usersFixture;
       if (path === '/labs') return labsFixture;
       if (opts?.method === 'PATCH') return {};
+      if (opts?.method === 'DELETE') return {};
+      if (opts?.method === 'POST' && path === '/users') return { id: 'u2' };
       if (opts?.method === 'POST' && path.endsWith('/reset-password'))
         return { tempPassword: 'AbCd1234' };
       throw new Error(`unmocked ${opts?.method ?? 'GET'} ${path}`);
@@ -143,6 +145,103 @@ describe('/admin/users page', () => {
       expect(toast.error as any).toHaveBeenCalled();
       expect(
         screen.queryByTestId('admin-users-edit-name'),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it('删除用户 → DELETE 调用 + dialog 关闭 + toast', async () => {
+    const { toast } = await import('sonner');
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    renderWithQuery(<UsersPage />);
+
+    await waitFor(() => screen.getByText('Alice'));
+    await user.click(screen.getByTestId('admin-users-row-u1-actions'));
+    await user.click(screen.getByTestId('admin-users-row-u1-delete'));
+
+    await user.click(screen.getByTestId('admin-users-delete-confirm'));
+
+    await waitFor(() => {
+      expect(mockApiFetch).toHaveBeenCalledWith(
+        '/users/u1',
+        expect.objectContaining({ method: 'DELETE' }),
+      );
+      expect(
+        (toast.success as any).mock.calls.some((c: any[]) =>
+          String(c[0]).includes('alice@lab.local'),
+        ),
+      ).toBe(true);
+    });
+  });
+
+  it('添加用户 → POST /users + body 含 email/password/roles + dialog 关闭', async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    renderWithQuery(<UsersPage />);
+
+    await waitFor(() => screen.getByText('Alice'));
+    await user.click(screen.getByTestId('admin-users-create-btn'));
+
+    await user.type(
+      await screen.findByTestId('admin-users-create-email'),
+      'bob@lab.local',
+    );
+    await user.type(screen.getByTestId('admin-users-create-name'), 'Bob');
+    await user.type(
+      screen.getByTestId('admin-users-create-password'),
+      'Bob12345',
+    );
+
+    await user.click(screen.getByTestId('admin-users-create-submit'));
+
+    await waitFor(() => {
+      const postCall = mockApiFetch.mock.calls.find(
+        (c) => c[1]?.method === 'POST' && c[0] === '/users',
+      );
+      expect(postCall).toBeDefined();
+      expect(postCall![1].body).toMatchObject({
+        email: 'bob@lab.local',
+        name: 'Bob',
+        password: 'Bob12345',
+        roles: ['PLAIN_USER'],
+      });
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.queryByTestId('admin-users-create-email'),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  it('创建失败 → toast.error 且 dialog 不关', async () => {
+    const { toast } = await import('sonner');
+    mockApiFetch.mockImplementation(async (path: string, opts?: any) => {
+      if (path === '/users' && (!opts || !opts.method)) return usersFixture;
+      if (path === '/labs') return labsFixture;
+      if (opts?.method === 'POST' && path === '/users')
+        throw new Error('API 409: email exists');
+      throw new Error('unmocked');
+    });
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    renderWithQuery(<UsersPage />);
+    await waitFor(() => screen.getByText('Alice'));
+
+    await user.click(screen.getByTestId('admin-users-create-btn'));
+    await user.type(
+      await screen.findByTestId('admin-users-create-email'),
+      'bob@lab.local',
+    );
+    await user.type(screen.getByTestId('admin-users-create-name'), 'Bob');
+    await user.type(
+      screen.getByTestId('admin-users-create-password'),
+      'Bob12345',
+    );
+    await user.click(screen.getByTestId('admin-users-create-submit'));
+
+    await waitFor(() => {
+      expect(toast.error as any).toHaveBeenCalled();
+      expect(
+        screen.queryByTestId('admin-users-create-email'),
       ).toBeInTheDocument();
     });
   });

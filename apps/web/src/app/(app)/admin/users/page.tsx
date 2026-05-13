@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ColumnDef } from '@tanstack/react-table';
 import { useQueryClient } from '@tanstack/react-query';
-import { MoreHorizontal } from 'lucide-react';
+import { MoreHorizontal, Plus } from 'lucide-react';
 import { z } from 'zod';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/data/PageHeader';
@@ -61,6 +61,24 @@ const updateSchema = z.object({
 
 type UpdateValues = z.infer<typeof updateSchema>;
 
+const createSchema = z.object({
+  email: z.string().email('邮箱格式不正确'),
+  name: z.string().min(2, '姓名至少 2 个字'),
+  password: z.string().min(8, '密码至少 8 位'),
+  labId: z.string().optional(),
+  roles: z.array(z.enum(ALL_ROLES)).min(1, '至少 1 个角色'),
+});
+
+type CreateValues = z.infer<typeof createSchema>;
+
+const createDefaults: CreateValues = {
+  email: '',
+  name: '',
+  password: '',
+  labId: '',
+  roles: ['PLAIN_USER'],
+};
+
 export default function UsersPage() {
   const token = useAuth((s) => s.tokens?.accessToken);
   const qc = useQueryClient();
@@ -71,6 +89,8 @@ export default function UsersPage() {
 
   const [editing, setEditing] = useState<UserRow | null>(null);
   const [resetting, setResetting] = useState<UserRow | null>(null);
+  const [deleting, setDeleting] = useState<UserRow | null>(null);
+  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     if (usersQuery.error) {
@@ -153,6 +173,13 @@ export default function UsersPage() {
             >
               重置密码
             </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => setDeleting(row.original)}
+              className="text-destructive focus:text-destructive"
+              data-testid={`admin-users-row-${row.original.id}-delete`}
+            >
+              删除
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       ),
@@ -161,7 +188,18 @@ export default function UsersPage() {
 
   return (
     <div data-testid="admin-users-page">
-      <PageHeader title="用户管理" subtitle="系统全部用户" />
+      <PageHeader
+        title="用户管理"
+        subtitle="系统全部用户"
+        actions={
+          <Button
+            onClick={() => setCreating(true)}
+            data-testid="admin-users-create-btn"
+          >
+            <Plus className="mr-2 h-4 w-4" /> 添加用户
+          </Button>
+        }
+      />
       <Card className="p-2">
         <DataTable
           columns={columns}
@@ -312,6 +350,173 @@ export default function UsersPage() {
             throw e;
           }
         }}
+      />
+
+      <ConfirmDialog
+        open={!!deleting}
+        onOpenChange={(o) => !o && setDeleting(null)}
+        title="删除用户"
+        description={`确认删除用户"${deleting?.email}"？该操作会立即吊销其所有登录会话(软删除可在数据库层恢复)。`}
+        confirmLabel="确认删除"
+        destructive
+        testId="admin-users-delete"
+        onConfirm={async () => {
+          if (!deleting) return;
+          try {
+            await apiFetch(`/users/${deleting.id}`, {
+              method: 'DELETE',
+              token,
+            });
+            toast.success(`已删除 ${deleting.email}`);
+            setDeleting(null);
+            await refresh();
+          } catch (e: any) {
+            toast.error(e.message ?? '删除失败');
+            throw e;
+          }
+        }}
+      />
+
+      <FormDialog
+        open={creating}
+        onOpenChange={setCreating}
+        schema={createSchema}
+        defaultValues={createDefaults}
+        title="添加用户"
+        description="创建新用户并分配角色"
+        submitLabel="创建"
+        testId="admin-users-create"
+        onSubmit={async (values) => {
+          try {
+            await apiFetch('/users', {
+              method: 'POST',
+              token,
+              body: {
+                email: values.email,
+                name: values.name,
+                password: values.password,
+                labId: values.labId || undefined,
+                roles: values.roles,
+              },
+            });
+            toast.success('已创建');
+            setCreating(false);
+            await refresh();
+          } catch (e: any) {
+            toast.error(e.message ?? '创建失败');
+            throw e;
+          }
+        }}
+        fields={(form) => (
+          <>
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>邮箱</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="email"
+                      data-testid="admin-users-create-email"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>姓名</FormLabel>
+                  <FormControl>
+                    <Input
+                      data-testid="admin-users-create-name"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="password"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>初始密码</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="password"
+                      data-testid="admin-users-create-password"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="labId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>实验室</FormLabel>
+                  <FormControl>
+                    <Combobox
+                      options={labOptions}
+                      value={field.value ?? ''}
+                      onChange={field.onChange}
+                      placeholder="选择实验室"
+                      searchPlaceholder="搜索实验室..."
+                      emptyText="无匹配实验室"
+                      testId="admin-users-create-lab"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="roles"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>角色</FormLabel>
+                  <div className="flex flex-wrap gap-3">
+                    {ALL_ROLES.map((r) => {
+                      const checked = (field.value as string[]).includes(r);
+                      return (
+                        <label
+                          key={r}
+                          className="flex cursor-pointer items-center gap-2 text-sm"
+                        >
+                          <Checkbox
+                            checked={checked}
+                            onCheckedChange={(v) => {
+                              const next = v === true
+                                ? [...(field.value as string[]), r]
+                                : (field.value as string[]).filter(
+                                    (x) => x !== r,
+                                  );
+                              field.onChange(next);
+                            }}
+                            data-testid={`admin-users-create-role-${r}`}
+                          />
+                          {r}
+                        </label>
+                      );
+                    })}
+                  </div>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </>
+        )}
       />
     </div>
   );
