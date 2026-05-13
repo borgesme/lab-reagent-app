@@ -7,7 +7,6 @@ import {
 } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
-import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter';
 import { Audit } from '../src/common/decorators/audit.decorator';
 import { Public } from '../src/common/decorators/public.decorator';
 import { PrismaService } from '../src/prisma/prisma.service';
@@ -33,7 +32,6 @@ describe('Audit interceptor', () => {
     }).compile();
     app = mod.createNestApplication();
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
-    app.useGlobalFilters(new HttpExceptionFilter());
     await app.init();
     prisma = app.get(PrismaService);
     await prisma.auditLog.deleteMany({ where: { action: 'TEST_CREATE' } });

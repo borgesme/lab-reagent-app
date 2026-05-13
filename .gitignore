@@ -5,6 +5,8 @@ dist
 .next
 coverage
 *.log
+/logs/
+apps/api/logs/
 apps/api/.env
 .superpowers/
 

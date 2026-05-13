@@ -2,7 +2,6 @@ import { Test } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
-import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter';
 import { expectOk } from './helpers/expect-ok';
 
 describe('Response wrapper (e2e)', () => {
@@ -17,7 +16,6 @@ describe('Response wrapper (e2e)', () => {
     app.useGlobalPipes(
       new ValidationPipe({ whitelist: true, transform: true }),
     );
-    app.useGlobalFilters(new HttpExceptionFilter());
     await app.init();
   });
 

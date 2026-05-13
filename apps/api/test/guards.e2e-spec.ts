@@ -7,7 +7,6 @@ import {
 } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
-import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter';
 import { Roles } from '../src/common/decorators/roles.decorator';
 import { CurrentUser } from '../src/common/decorators/current-user.decorator';
 import { expectOk, expectBizError } from './helpers/expect-ok';
@@ -32,7 +31,6 @@ describe('Guards', () => {
     }).compile();
     app = mod.createNestApplication();
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
-    app.useGlobalFilters(new HttpExceptionFilter());
     await app.init();
 
     const res = await request(app.getHttpServer())
