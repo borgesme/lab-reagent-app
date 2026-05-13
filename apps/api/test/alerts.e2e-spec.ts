@@ -116,7 +116,7 @@ describe('Alerts', () => {
 
   describe('AlertsService.runDaily', () => {
     it('creates notifications for expiring + low stock + reconcile', async () => {
-      const alerts = app.get((await import('../src/alerts/alerts.service')).AlertsService);
+      const alerts = app.get((await import('../src/modules/alerts/alerts.service')).AlertsService);
 
       await prisma.labReagentConfig.upsert({
         where: {
@@ -158,7 +158,7 @@ describe('Alerts', () => {
     });
 
     it('second runDaily same day is idempotent', async () => {
-      const alerts = app.get((await import('../src/alerts/alerts.service')).AlertsService);
+      const alerts = app.get((await import('../src/modules/alerts/alerts.service')).AlertsService);
       const before = await prisma.notification.count({
         where: { recipientId: labHeadId, readAt: null },
       });
@@ -170,7 +170,7 @@ describe('Alerts', () => {
     });
 
     it('skips lowStock when config absent but still emits expiring', async () => {
-      const alerts = app.get((await import('../src/alerts/alerts.service')).AlertsService);
+      const alerts = app.get((await import('../src/modules/alerts/alerts.service')).AlertsService);
 
       const r2 = await prisma.reagent.upsert({
         where: { id: 'reagent-no-config' },
@@ -213,7 +213,7 @@ describe('Alerts', () => {
     });
 
     it('reports controlled reconcile anomaly when qty mismatch', async () => {
-      const alerts = app.get((await import('../src/alerts/alerts.service')).AlertsService);
+      const alerts = app.get((await import('../src/modules/alerts/alerts.service')).AlertsService);
 
       const ctrl = await prisma.reagent.upsert({
         where: { id: 'reagent-ctrl-alert' },

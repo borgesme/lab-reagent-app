@@ -3,8 +3,8 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
-import { NotificationsService } from '../src/notifications/notifications.service';
-import { MailerService } from '../src/notifications/mailer.service';
+import { NotificationsService } from '../src/modules/notifications/notifications.service';
+import { MailerService } from '../src/modules/notifications/mailer.service';
 import { expectOk, expectBizError } from './helpers/expect-ok';
 
 describe('Notifications', () => {

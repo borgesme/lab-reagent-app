@@ -82,7 +82,7 @@ describe('Ledger', () => {
   describe('snapshots', () => {
     it('service.generateMonthly upserts snapshot', async () => {
       const svc = app.get<any>(
-        require('../src/ledger/ledger.service').LedgerService,
+        require('../src/modules/ledger/ledger.service').LedgerService,
       );
       const snap = await svc.generateMonthly('2100-03', 'lab-default');
       expect(snap.labId).toBe('lab-default');
@@ -104,7 +104,7 @@ describe('Ledger', () => {
 
     it('GET /controlled-ledger/snapshots/:id returns CSV', async () => {
       const svc = app.get<any>(
-        require('../src/ledger/ledger.service').LedgerService,
+        require('../src/modules/ledger/ledger.service').LedgerService,
       );
       const snap = await svc.generateMonthly('2100-04', 'lab-default');
       const r = await request(app.getHttpServer())
