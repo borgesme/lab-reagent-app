@@ -151,4 +151,90 @@ describe('/reagents page', () => {
       screen.getByTestId('reagents-row-r1-actions'),
     ).toBeInTheDocument();
   });
+
+  it('添加试剂 → POST /reagents body 含 8 字段 + dialog 关闭', async () => {
+    mockApiFetch.mockImplementation(async (path: string, opts?: any) => {
+      if (path.startsWith('/reagents') && !opts?.method)
+        return reagentsFixture;
+      if (opts?.method === 'POST' && path === '/reagents')
+        return { id: 'r-new' };
+      throw new Error(`unmocked ${opts?.method ?? 'GET'} ${path}`);
+    });
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    renderWithQuery(<ReagentsPage />);
+    await waitFor(() => screen.getByText('乙醇'));
+
+    await user.click(screen.getByTestId('reagents-create-btn'));
+
+    await user.type(
+      await screen.findByTestId('reagents-create-name'),
+      '丙酮',
+    );
+    await user.type(screen.getByTestId('reagents-create-cas'), '67-64-1');
+    await user.type(screen.getByTestId('reagents-create-formula'), 'C3H6O');
+    await user.type(screen.getByTestId('reagents-create-specification'), 'AR');
+    await user.type(screen.getByTestId('reagents-create-category'), '有机溶剂');
+    await user.type(
+      screen.getByTestId('reagents-create-msds'),
+      'https://example.com/msds.pdf',
+    );
+
+    await user.click(screen.getByTestId('reagents-create-hazard'));
+    await user.click(await screen.findByRole('option', { name: 'DANGEROUS' }));
+
+    await user.click(screen.getByTestId('reagents-create-submit'));
+
+    await waitFor(() => {
+      const post = mockApiFetch.mock.calls.find(
+        (c) => c[1]?.method === 'POST' && c[0] === '/reagents',
+      );
+      expect(post).toBeDefined();
+      expect(post![1].body).toMatchObject({
+        name: '丙酮',
+        cas: '67-64-1',
+        formula: 'C3H6O',
+        specification: 'AR',
+        category: '有机溶剂',
+        hazardLevel: 'DANGEROUS',
+        msdsFileUrl: 'https://example.com/msds.pdf',
+      });
+      expect(post![1].body.controlType).toBeUndefined();
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.queryByTestId('reagents-create-name'),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  it('添加失败 → toast.error + dialog 保持打开', async () => {
+    const { toast } = await import('sonner');
+    mockApiFetch.mockImplementation(async (path: string, opts?: any) => {
+      if (path.startsWith('/reagents') && !opts?.method)
+        return reagentsFixture;
+      if (opts?.method === 'POST' && path === '/reagents')
+        throw new Error('API 422: 名称重复');
+      throw new Error('unmocked');
+    });
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    renderWithQuery(<ReagentsPage />);
+    await waitFor(() => screen.getByText('乙醇'));
+
+    await user.click(screen.getByTestId('reagents-create-btn'));
+    await user.type(
+      await screen.findByTestId('reagents-create-name'),
+      '丙酮',
+    );
+    await user.click(screen.getByTestId('reagents-create-hazard'));
+    await user.click(await screen.findByRole('option', { name: 'NORMAL' }));
+    await user.click(screen.getByTestId('reagents-create-submit'));
+
+    await waitFor(() => {
+      expect(toast.error as any).toHaveBeenCalled();
+      expect(screen.getByTestId('reagents-create-name')).toBeInTheDocument();
+    });
+  });
 });
