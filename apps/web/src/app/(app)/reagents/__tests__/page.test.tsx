@@ -305,4 +305,82 @@ describe('/reagents page', () => {
       ).toBe(true);
     });
   });
+
+  it('hazardLevel=CONTROLLED → controlType Select 显示并能选, body 带 controlType', async () => {
+    mockApiFetch.mockImplementation(async (path: string, opts?: any) => {
+      if (path.startsWith('/reagents') && !opts?.method)
+        return reagentsFixture;
+      if (opts?.method === 'POST' && path === '/reagents')
+        return { id: 'r-new' };
+      throw new Error(`unmocked ${opts?.method ?? 'GET'} ${path}`);
+    });
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    renderWithQuery(<ReagentsPage />);
+    await waitFor(() => screen.getByText('乙醇'));
+
+    await user.click(screen.getByTestId('reagents-create-btn'));
+    await user.type(
+      await screen.findByTestId('reagents-create-name'),
+      '吗啡',
+    );
+
+    expect(
+      screen.queryByTestId('reagents-create-control'),
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByTestId('reagents-create-hazard'));
+    await user.click(await screen.findByRole('option', { name: 'CONTROLLED' }));
+
+    await user.click(
+      await screen.findByTestId('reagents-create-control'),
+    );
+    await user.click(await screen.findByRole('option', { name: 'NARCOTIC' }));
+
+    await user.click(screen.getByTestId('reagents-create-submit'));
+
+    await waitFor(() => {
+      const post = mockApiFetch.mock.calls.find(
+        (c) => c[1]?.method === 'POST' && c[0] === '/reagents',
+      );
+      expect(post).toBeDefined();
+      expect(post![1].body.hazardLevel).toBe('CONTROLLED');
+      expect(post![1].body.controlType).toBe('NARCOTIC');
+    });
+  });
+
+  it('hazardLevel=NORMAL → controlType 字段不渲染, body 不带 controlType', async () => {
+    mockApiFetch.mockImplementation(async (path: string, opts?: any) => {
+      if (path.startsWith('/reagents') && !opts?.method)
+        return reagentsFixture;
+      if (opts?.method === 'POST' && path === '/reagents')
+        return { id: 'r-new' };
+      throw new Error(`unmocked ${opts?.method ?? 'GET'} ${path}`);
+    });
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    renderWithQuery(<ReagentsPage />);
+    await waitFor(() => screen.getByText('乙醇'));
+
+    await user.click(screen.getByTestId('reagents-create-btn'));
+    await user.type(
+      await screen.findByTestId('reagents-create-name'),
+      '水',
+    );
+
+    expect(
+      screen.queryByTestId('reagents-create-control'),
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByTestId('reagents-create-submit'));
+
+    await waitFor(() => {
+      const post = mockApiFetch.mock.calls.find(
+        (c) => c[1]?.method === 'POST' && c[0] === '/reagents',
+      );
+      expect(post).toBeDefined();
+      expect(post![1].body.hazardLevel).toBe('NORMAL');
+      expect(post![1].body.controlType).toBeUndefined();
+    });
+  });
 });
