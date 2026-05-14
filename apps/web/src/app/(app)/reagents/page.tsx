@@ -297,6 +297,46 @@ export default function ReagentsPage() {
         }}
         fields={(form) => <ReagentFields form={form} mode="create" />}
       />
+
+      <FormDialog
+        open={!!editing}
+        onOpenChange={(o) => !o && setEditing(null)}
+        schema={schema}
+        defaultValues={
+          editing
+            ? {
+                name: editing.name,
+                cas: editing.cas ?? '',
+                formula: editing.formula ?? '',
+                specification: editing.specification ?? '',
+                category: editing.category ?? '',
+                hazardLevel: editing.hazardLevel,
+                controlType: editing.controlType ?? undefined,
+                msdsFileUrl: editing.msdsFileUrl ?? '',
+              }
+            : createDefaults
+        }
+        title="编辑试剂"
+        description={editing ? `修改 ${editing.name}` : ''}
+        testId="reagents-edit"
+        onSubmit={async (values) => {
+          if (!editing) return;
+          try {
+            await apiFetch(`/reagents/${editing.id}`, {
+              method: 'PATCH',
+              token,
+              body: buildBody(values),
+            });
+            toast.success('已更新');
+            setEditing(null);
+            await refresh();
+          } catch (e: any) {
+            toast.error(e.message ?? '更新失败');
+            throw e;
+          }
+        }}
+        fields={(form) => <ReagentFields form={form} mode="edit" />}
+      />
     </div>
   );
 }

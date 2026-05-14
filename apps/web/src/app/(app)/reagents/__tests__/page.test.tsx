@@ -237,4 +237,41 @@ describe('/reagents page', () => {
       expect(screen.getByTestId('reagents-create-name')).toBeInTheDocument();
     });
   });
+
+  it('编辑试剂 → PATCH /reagents/{id} body 含改动字段 + dialog 关闭', async () => {
+    mockApiFetch.mockImplementation(async (path: string, opts?: any) => {
+      if (path.startsWith('/reagents') && !opts?.method)
+        return reagentsFixture;
+      if (opts?.method === 'PATCH' && path === '/reagents/r1') return {};
+      throw new Error(`unmocked ${opts?.method ?? 'GET'} ${path}`);
+    });
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    renderWithQuery(<ReagentsPage />);
+    await waitFor(() => screen.getByText('乙醇'));
+
+    await user.click(screen.getByTestId('reagents-row-r1-actions'));
+    await user.click(screen.getByTestId('reagents-row-r1-edit'));
+
+    const nameInput = await screen.findByTestId('reagents-edit-name');
+    await user.clear(nameInput);
+    await user.type(nameInput, '无水乙醇');
+
+    await user.click(screen.getByTestId('reagents-edit-submit'));
+
+    await waitFor(() => {
+      const patch = mockApiFetch.mock.calls.find(
+        (c) => c[1]?.method === 'PATCH' && c[0] === '/reagents/r1',
+      );
+      expect(patch).toBeDefined();
+      expect(patch![1].body.name).toBe('无水乙醇');
+      expect(patch![1].body.hazardLevel).toBe('NORMAL');
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.queryByTestId('reagents-edit-name'),
+      ).not.toBeInTheDocument();
+    });
+  });
 });
