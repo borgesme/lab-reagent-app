@@ -16,7 +16,6 @@
 
 ### 非目标
 - 微信一键登录、手机号登录
-- vue-i18n 国际化
 - 推送通知 / 网络断线监听
 - e2e 自动化（playwright 不覆盖小程序）
 - 老 Taro 工程归档/删除
@@ -33,8 +32,10 @@
 | 6 | 状态管理 | Pinia + persistedstate（uni storage 适配） | uniapp Vue3 标配 |
 | 7 | 401 策略 | 全量对齐 web：refresh → 重放 + Promise 锁去重 | 跨端一致；避免"刚打开就跳登录" |
 | 8 | IA | 5 tab：home / my-requests / approvals / notifications / **mine**（新增） | 补 logout 入口缺口；其他业务 1:1 迁移 |
-| 9 | 测试基线 | vitest 覆盖 lib / stores / hooks（≈35 用例），页面不强要 | 工程基建质量保底，页面交互手动走查 |
+| 9 | 测试基线 | vitest 覆盖 lib / stores / hooks / i18n（≈38 用例），页面不强要 | 工程基建质量保底，页面交互手动走查 |
 | 10 | 平台 | 默认 dev/build：h5 + mp-weixin；其他平台命令保留 | 范围聚焦 |
+| 11 | 国际化 | vue-i18n 9.x，中英双语，**本次覆盖基础按钮 + 通用提示语**；业务文案/页面标题作为渐进式后续 | 多端基线，留好结构；YAGNI 控范围 |
+| 12 | 环境变量 | `.env.development` + `.env.production`：`VITE_APP_ENV` / `VITE_ROUTER_BASE` / `VITE_BASE_URL` 三个变量 | 区分环境与多形态部署所需 |
 
 ## 3. 工程骨架
 
@@ -67,9 +68,16 @@ apps/miniapp-uni/
 │   │   ├── useLoginCheck.ts
 │   │   ├── useWxCapsuleRect.ts
 │   │   └── useBootTokenRefresh.ts
+│   ├── locale/
+│   │   ├── index.ts             # createI18n + 加载 messages + 持久化适配
+│   │   ├── zh-CN.ts
+│   │   └── en.ts
 │   ├── utils/storage.ts
-│   ├── config/env.ts            # VITE_API_BASE 单一出口
+│   ├── config/env.ts            # VITE_APP_ENV / VITE_ROUTER_BASE / VITE_BASE_URL 单一出口
 │   └── styles/{common,flex,index}.scss
+├── .env.development             # VITE_APP_ENV / VITE_ROUTER_BASE / VITE_BASE_URL
+├── .env.production
+├── .env.example                 # 模板，纳入 git
 ├── package.json
 ├── vite.config.ts               # @ alias + /api proxy + esbuild drop console (prod)
 ├── tsconfig.json                # 继承根；@app/shared 路径映射
@@ -83,6 +91,7 @@ apps/miniapp-uni/
 - Vue 3.5.x + uniapp `^3.0.0-alpha-4080620251107001`（Art-app 同款 alpha）
 - Pinia ^3.x + pinia-plugin-persistedstate ^4.x
 - uview-plus 最新稳定版（uni_modules 形式）
+- vue-i18n ^9.14.x（与 Art-app 同款）
 - TypeScript ^5.4
 - vite ^5.x + `@dcloudio/vite-plugin-uni`
 - vitest ^1.x + `@vue/test-utils`
@@ -103,6 +112,31 @@ apps/miniapp-uni/
   "test:watch": "vitest"
 }
 ```
+
+### 3.4 环境变量
+
+`.env.development` / `.env.production` 三个变量（`.env.example` 同步、纳入 git）：
+
+| 变量 | dev 默认 | prod 默认 | 用途 |
+|---|---|---|---|
+| `VITE_APP_ENV` | `development` | `production` | 业务层条件渲染（如内测水印、调试面板）；`config/env.ts` 暴露 `isDev/isProd` |
+| `VITE_ROUTER_BASE` | `/` | `/`（部署子路径时改） | **仅 H5 有效**：vite `base` + `manifest.json` `h5.router.base`；小程序无效 |
+| `VITE_BASE_URL` | `http://localhost:3001/api/v1` | `https://api.example.com/api/v1`（占位） | API base URL；小程序必须完整 URL；H5 也用完整 URL（不走 vite proxy，避免 dev 时 H5/小程序行为分叉） |
+
+`config/env.ts` 集中读取：
+```ts
+export const env = {
+  appEnv: import.meta.env.VITE_APP_ENV ?? 'development',
+  routerBase: import.meta.env.VITE_ROUTER_BASE ?? '/',
+  baseUrl: import.meta.env.VITE_BASE_URL ?? 'http://localhost:3001/api/v1',
+  isDev: import.meta.env.VITE_APP_ENV === 'development',
+  isProd: import.meta.env.VITE_APP_ENV === 'production',
+};
+```
+
+- `vite.config.ts` 的 `base` 字段消费 `VITE_ROUTER_BASE`（H5 部署子路径所需）
+- `manifest.json` 的 `h5.router.base` 用 vite `define` 注入（构建期替换）
+- 后端 NestJS 已开 CORS，H5 dev 不需 vite proxy，全平台统一走完整 URL
 
 ## 4. UI 与导航
 
@@ -134,6 +168,22 @@ apps/miniapp-uni/
 - 移植 Art-app 的 `useRefreshList`，状态机：`'none' | 'refreshing' | 'empty' | 'ended' | 'loading'`
 - 应用于 search / my-requests / approvals / notifications
 
+### 4.6 国际化（vue-i18n）
+
+**范围（本次）**：基础按钮（提交/取消/确认/重试/全部已读/退出登录/通过/拒绝/...）+ 通用提示语（加载中/请求失败/网络异常/会话已失效/操作成功/...）+ 5 个 tab 名称 + NavBar 标题。业务表单 label/字段名作为渐进式后续可单独 PR 补齐，不阻塞本次落地。
+
+**接入**
+- `src/locale/index.ts`：`createI18n({ legacy: false, locale, fallbackLocale: 'zh-CN', messages: { 'zh-CN': zhCN, en } })`，`main.ts` `app.use(i18n)`
+- `src/locale/zh-CN.ts` `src/locale/en.ts`：导出 `{ common: {...}, toast: {...}, tabBar: {...}, pageTitle: {...} }` 命名空间结构
+- 默认语言：`uni.getSystemInfoSync().language`（小程序）或 `navigator.language`（H5）→ 命中 `zh-*` 用 `zh-CN`，命中 `en-*` 用 `en`，否则 `zh-CN` fallback
+- 持久化：选中语言写入 `uni.setStorageSync('mp.locale', 'zh-CN' | 'en')`，下次启动优先于系统语言
+- 切换 UI：mine 页底部加一个"语言 / Language" cell，点击 `u-action-sheet` 弹出 `中文 / English`，切换后 `i18n.global.locale.value = ...` + 写 storage
+
+**用法约定**
+- 模板：`<u-button>{{ $t('common.submit') }}</u-button>`
+- 脚本：`import { useI18n } from 'vue-i18n'; const { t } = useI18n(); uni.showToast({ title: t('toast.networkError'), icon: 'none' })`
+- `api/request.ts` 内部 toast 改用 `t(...)`，需要导出工厂函数或在文件顶部 `import { i18n } from '@/locale'; const t = i18n.global.t;`
+
 ## 5. 网络层与 auth-store
 
 ### 5.1 `stores/auth.ts`
@@ -152,10 +202,8 @@ interface AuthState {
 
 ### 5.2 `api/request.ts`
 **核心契约**
-- baseUrl：`(import.meta.env.VITE_API_BASE as string) ?? 'http://localhost:3001/api/v1'`
-  - 小程序不支持相对路径，必须完整 URL
-  - H5 dev：在 `vite.config.ts` 内对 `/api` 走 proxy 到 `http://localhost:3001`；`.env.development` 设 `VITE_API_BASE=/api/v1` 切换到代理路径
-  - mp-weixin dev/build：用完整 URL（`http://localhost:3001/api/v1` 或线上域名）；上线前要把域名加入小程序后台白名单
+- baseUrl 来自 `config/env.ts` 的 `env.baseUrl`（即 `VITE_BASE_URL`，dev 默认 `http://localhost:3001/api/v1`）
+- 小程序不支持相对路径；H5 也用完整 URL（NestJS 后端 dev 已开 CORS），各端行为一致
 - HTTP statusCode 非 200 → throw + toast"网络异常"
 - 业务 200 + body.code = 200 → 解包 `body.data` 返回
 - 业务 200 + body.code = 401 → `tryRefresh` → 拿到新 token 重放原请求；refresh 失败 → `clear` + `reLaunch login`
@@ -200,7 +248,7 @@ interface AuthState {
 | 5 | `pages/approvals` | ✅ 审批 | 审批人/采购员/管理员 | `GET /requests?status=PENDING` `GET /purchases`；`POST /requests/:id/approvals`；`POST /purchases/batches/:id/approve` | 顶 `u-tabs` 切换"领用/采购"；卡片 + `u-textarea` 备注 + `u-button-group`（一审/二审/通过/拒绝）；管控试剂显示二审按钮 |
 | 6 | `pages/notifications` | ✅ 消息 | 全员 | `GET /notifications`；`POST /notifications/:id/read`；`POST /notifications/read-all` | 列表项点击未读 `read(id)`；右上角"全部已读"`u-button` |
 | 7 | `package-business/pages/report-summary` | 否 | 角色受限 | `GET /reports/usage-trend?range=30d&summary=1` `GET /reports/inventory-turnover?range=30d&summary=1` `GET /reports/purchase-amount?range=month&groupBy=month&summary=1` | 3 张 `u-card`；按 `REPORT_SCOPE_MATRIX[role][slug]` 控制可见；失败显示重试；入口在 home + mine |
-| 8 | `pages/mine` ⭐ | ✅ 我的 | 全员 | `GET /auth/me` (onShow)；`PATCH /auth/me`；`POST /auth/change-password` | `u-cell-group`：头像+姓名+角色 → 修改资料 → 修改密码 → 报表概览(角色受限) → 关于 → **退出登录**（红色，confirm 后 `clear` + `reLaunch login`） |
+| 8 | `pages/mine` ⭐ | ✅ 我的 | 全员 | `GET /auth/me` (onShow)；`PATCH /auth/me`；`POST /auth/change-password` | `u-cell-group`：头像+姓名+角色 → 修改资料 → 修改密码 → 报表概览(角色受限) → 语言/Language(切换 zh-CN/en) → 关于 → **退出登录**（红色，confirm 后 `clear` + `reLaunch login`） |
 
 ### 6.3 通用约定
 - 顶部 `<NavBar :title="..." />`
@@ -224,7 +272,8 @@ interface AuthState {
 | `api/modules/*.test.ts` | 6 | auth/reagents/requests 三个核心模块的 URL 拼接 + method（mock `apiRequest`） |
 | `hooks/useRefreshList.test.ts` | 6 | 状态机迁移 |
 | `hooks/useLoginCheck.test.ts` | 3 | 已登录直行；未登录 navigate；带 redirect 参数 |
-| **合计** | **≈35** | |
+| `locale/index.test.ts` | 3 | 默认语言探测（zh/en/fallback）；切换 + 持久化；`t(key)` 命中两种语言 |
+| **合计** | **≈38** | |
 
 **Mock 策略**
 - `vitest.setup.ts` 全局 mock `uni`：`request/showToast/showLoading/setStorageSync/getStorageSync/removeStorageSync/reLaunch/navigateTo/switchTab` 用 `vi.fn()`，挂到 `globalThis.uni`
@@ -233,14 +282,15 @@ interface AuthState {
 
 ## 8. 验收标准（DoD）
 
-1. `pnpm --filter @app/miniapp-uni test` 35 用例全过
+1. `pnpm --filter @app/miniapp-uni test` 38 用例全过
 2. `pnpm --filter @app/miniapp-uni build:h5` 与 `build:mp-weixin` 双双成功
 3. H5 dev 用 `admin@lab.local / admin123` 跑通：登录 → 工作台 → 搜索试剂 → 提交领用申请 → 切到审批通过 → 看到通知 → 我的页改密 → 退出登录
 4. 微信开发者工具打开 `dist/dev/mp-weixin` 跑通同链路（appid `touristappid`）
-5. 401 自动 refresh 实测：手动改 access token 为非法值，业务请求自动 refresh 一次后正常返回
+5. 401 自动 refresh 实测：手动改 access token 为非法值,业务请求自动 refresh 一次后正常返回
 6. tokenVersion 失效实测：admin 在 web 端改密后，miniapp-uni 端下一次请求自动登出
-7. `apiBaseUrl`：H5 dev 用 `/api/v1`（vite proxy）；mp-weixin 用完整 URL `http://localhost:3001/api/v1`
-8. 老 Taro 工程 `apps/miniapp` 不动，可继续构建运行
+7. 三个环境变量正确读取：`config/env.ts` 暴露的 `baseUrl/routerBase/appEnv` 在 H5 build:production 后通过控制台 `console.log(env)` 验证为 `.env.production` 中的值
+8. i18n 切换实测：mine 页切换"中文/English"后，tabBar 名称、所有按钮、所有 toast 立即应用新语言；重启 app 仍保留选中语言
+9. 老 Taro 工程 `apps/miniapp` 不动，可继续构建运行
 
 ## 9. 风险与缓解
 
@@ -257,7 +307,7 @@ interface AuthState {
 ## 10. 范围外（YAGNI）
 
 - 微信一键登录 / 手机号登录
-- vue-i18n 国际化
 - 推送通知 / 网络断线监听
 - e2e 自动化（playwright 不覆盖小程序）
 - 老 Taro 工程归档/删除
+- i18n 业务文案/字段名（仅本次落地基础按钮+提示语+tabBar+NavBar标题，业务文案作为后续渐进 PR）
