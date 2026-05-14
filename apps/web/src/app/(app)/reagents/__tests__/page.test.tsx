@@ -51,7 +51,11 @@ describe('/reagents page', () => {
     vi.clearAllMocks();
     useAuth.setState({
       tokens: { accessToken: 'tok', refreshToken: 'r' } as any,
-      user: { id: 'u', email: 'u@lab.local' } as any,
+      user: {
+        id: 'u',
+        email: 'u@lab.local',
+        roles: ['SYS_ADMIN'],
+      } as any,
       hydrated: true,
     });
   });
@@ -111,4 +115,40 @@ describe('/reagents page', () => {
       { timeout: 5000 },
     );
   }, 10_000);
+
+  it('PLAIN_USER 角色 → 无 create-btn / 行末无 actions 菜单', async () => {
+    useAuth.setState({
+      tokens: { accessToken: 'tok', refreshToken: 'r' } as any,
+      user: { id: 'u', email: 'u@lab.local', roles: ['PLAIN_USER'] } as any,
+      hydrated: true,
+    });
+    mockApiFetch.mockResolvedValue(reagentsFixture);
+    renderWithQuery(<ReagentsPage />);
+    await waitFor(() => screen.getByText('乙醇'));
+
+    expect(screen.queryByTestId('reagents-create-btn')).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('reagents-row-r1-actions'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('REAGENT_ADMIN 角色 → 可见 create-btn 与行末 actions', async () => {
+    useAuth.setState({
+      tokens: { accessToken: 'tok', refreshToken: 'r' } as any,
+      user: {
+        id: 'admin',
+        email: 'admin@lab.local',
+        roles: ['REAGENT_ADMIN'],
+      } as any,
+      hydrated: true,
+    });
+    mockApiFetch.mockResolvedValue(reagentsFixture);
+    renderWithQuery(<ReagentsPage />);
+    await waitFor(() => screen.getByText('乙醇'));
+
+    expect(screen.getByTestId('reagents-create-btn')).toBeInTheDocument();
+    expect(
+      screen.getByTestId('reagents-row-r1-actions'),
+    ).toBeInTheDocument();
+  });
 });
