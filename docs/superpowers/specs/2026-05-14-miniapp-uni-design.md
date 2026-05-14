@@ -120,7 +120,7 @@ apps/miniapp-uni/
 | 变量 | dev 默认 | prod 默认 | 用途 |
 |---|---|---|---|
 | `VITE_APP_ENV` | `development` | `production` | 业务层条件渲染（如内测水印、调试面板）；`config/env.ts` 暴露 `isDev/isProd` |
-| `VITE_ROUTER_BASE` | `/` | `/`（部署子路径时改） | **仅 H5 有效**：vite `base` + `manifest.json` `h5.router.base`；小程序无效 |
+| `VITE_ROUTER_BASE` | `/` | `/`（部署子路径时改） | **仅 H5 有效**：驱动 `vite.config.ts` 的 `base` 字段（dev server + h5 build 都消费）；**不修改 `manifest.json`**——uniapp 编译时直接读 manifest，vite define 不参与 |
 | `VITE_BASE_URL` | `http://localhost:3001/api/v1` | `https://api.example.com/api/v1`（占位） | API base URL；小程序必须完整 URL；H5 也用完整 URL（不走 vite proxy，避免 dev 时 H5/小程序行为分叉） |
 
 `config/env.ts` 集中读取：
@@ -135,20 +135,25 @@ export const env = {
 ```
 
 - `vite.config.ts` 的 `base` 字段消费 `VITE_ROUTER_BASE`（H5 部署子路径所需）
-- `manifest.json` 的 `h5.router.base` 用 vite `define` 注入（构建期替换）
+- **不**用 vite `define` 注入 manifest.json；manifest.json 的 h5.router 配置保持静态写死
 - 后端 NestJS 已开 CORS，H5 dev 不需 vite proxy，全平台统一走完整 URL
 
 ## 4. UI 与导航
 
 ### 4.1 uview-plus 接入
 - `uni_modules/uview-plus/`（不走 npm，便于本地 patch 主题）
-- `pages.json` `easycom`：`"^u-(.*)"` + `"^up-(.*)"` 双前缀自动注册
-- `main.ts`：`app.use(uviewPlus)`
-- 主题色覆盖：在 `uni.scss` 顶部 `$u-primary: #10b981;` 置于 import 之前（uview-plus 内部用 `!default`）
+- `pages.json` `easycom`：`"^up-(.*)"` + `"^u-([^-].*)"` 双前缀自动注册（注意 `[^-]` 避免与 `up-` 冲突，与 Art-app `pages.json:95-101` 一致）
+- `main.ts`：`import uviewPlus from '@/uni_modules/uview-plus'; app.use(uviewPlus)`
+- **主题定制**：**直接修改 `src/uni_modules/uview-plus/theme.scss` 源文件**（uview-plus 的 theme.scss 内部赋值**没有 `!default`**，外部 `uni.scss` 前置赋值不会生效）。需要修改的变量：
+  - `$u-primary: #10b981;` `$u-primary-dark` `$u-primary-disabled` `$u-primary-light`
+  - `$u-button-plain-background-color: rgba(16, 185, 129, 0.20);`
+  - `$u-button-u-button-height` `$u-button-normal-font-size`（按钮高度/字号按 UI 复核值调整）
+  - 其他色阶（warning/success/error/info）默认保留
+- 这个文件**纳入 git**（属于工程内的定制层，不是依赖）
 
 ### 4.2 自定义导航
 - 所有页 `pages.json` `"navigationStyle":"custom"` `"navigationBarTextStyle":"black"`
-- `pages.json.tabBar`：保留 5 项最小占位 + `"custom":true`；备选方案是注释整段
+- `pages.json.tabBar`：**整段不写**（与 Art-app `pages.json:108-133` 一致——Art-app 把 tabBar 全段注释掉，由自定义组件接管）。不需要 `"custom":true` 字段
 - `components/tab-bar/tab-bar.vue`：固定底栏 5 项；点击调 `uni.switchTab` + 本地 active 同步；监听 `onShow` 同步索引
 - `components/nav-bar/nav-bar.vue`：左/中/右 slot；高度 = `statusBarHeight + capsuleHeight`；微信端胶囊避让由 `useWxCapsuleRect` 提供
 - `components/custom-bottom-area/`：底部安全区占位
@@ -294,15 +299,28 @@ interface AuthState {
 
 ## 9. 风险与缓解
 
+### 9.0 Phase 0 spike（实施前必须先验证）
+
+以下三项 Art-app 工程未实证，spec 默认假设可行；实施 plan 的 Phase 0 必须先做最小 spike 验证，**任一不通过则需调整 spec / 范围**：
+
+| Spike | 验证内容 | 通过标志 | 失败时调整方向 |
+|---|---|---|---|
+| S1 `@app/shared` 消费 | 在 miniapp-uni vite.config 配置后，`import { ApiResponse } from '@app/shared'` 能正常构建 H5 + mp-weixin | build 不报模块解析错误，运行时类型可用 | shared 加 ESM 输出 / vite.config 加 `optimizeDeps.include` / 改用本地 ts 类型副本 |
+| S2 vitest 在 uniapp+vue3 跑通 | 写一个最小 store 测试：`createPinia` + `setActivePinia` + 断言 | `pnpm test` 单用例通过 | 改用 jest（Art-app 也没 vitest，未必兼容）或退回手动验证 |
+| S3 vue-i18n 9.x 在 alpha 通道工作 | mine 页切换中英、tabBar 名称随之变化 | 切换后所有 `$t(...)` 引用立即更新 | 降级到 vue-i18n@9 + legacy mode / 退回手写 i18n 工具 |
+
+### 9.1 已识别风险
+
 | 风险 | 影响 | 缓解 |
 |---|---|---|
 | uniapp Vue3 alpha 通道 | 编译/运行潜在 bug | 锁 Art-app 同款已验证版本；遇问题降级路径切回 stable Vue2 通道（不在本次范围） |
-| `@app/shared` CJS 输出 + uniapp+vite ESM | 引入失败 | shared 已是 `tsc` 输出兼容形式，Art-app vite 配置可消费；预先验证 |
+| `@app/shared` CJS 输出 + uniapp+vite ESM | 引入失败 | Phase 0 S1 spike 优先验证；预案见 9.0 表 |
 | uview-plus easycom 在 vite alpha 下偶有热更失效 | DX 影响 | 重启 dev；记 README 已知问题 |
-| weapp `pages.json.tabBar` 必填 vs 自定义 TabBar 共存 | 编译报错 | 优先：5 项最小占位 + `"custom":true`；备选：整段注释 |
 | 微信小程序 2MB 主包限制 | 影响打包 | login/home/mine 主包；其余进 `package-business/` 分包；uview-plus 走 uni_modules 自动按需 |
-| vitest mock uni.* 不全 | 用例脆弱 | 集中维护 `vitest.setup.ts` |
+| vitest mock uni.* 不全 | 用例脆弱 | 集中维护 `vitest.setup.ts`；S2 spike 优先验证可行性 |
 | H5 端 `useWxCapsuleRect` 只对微信有效 | NavBar 高度异常 | hook 内 `#ifdef MP-WEIXIN` 取胶囊；其他端 fallback `statusBarHeight + 44rpx` |
+| vue-i18n 在 uniapp Vue3 alpha 通道未实证 | i18n 切换异常 | S3 spike 优先验证；预案见 9.0 表 |
+| uview-plus theme.scss 修改纳入 git | 与上游升级冲突 | 锁定版本不主动升级；如需升级在 PR 中手工 merge theme.scss 自定义部分 |
 
 ## 10. 范围外（YAGNI）
 
