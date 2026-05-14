@@ -11,6 +11,7 @@ import { PageHeader } from '@/components/data/PageHeader';
 import { DataTable } from '@/components/data/DataTable';
 import { Toolbar } from '@/components/data/Toolbar';
 import { FormDialog } from '@/components/data/FormDialog';
+import { ConfirmDialog } from '@/components/data/ConfirmDialog';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -336,6 +337,31 @@ export default function ReagentsPage() {
           }
         }}
         fields={(form) => <ReagentFields form={form} mode="edit" />}
+      />
+
+      <ConfirmDialog
+        open={!!deleting}
+        onOpenChange={(o) => !o && setDeleting(null)}
+        title="删除试剂"
+        description={`确认删除"${deleting?.name}"?该试剂会被软删除,关联的库存、申请记录不会被级联删除。`}
+        confirmLabel="确认删除"
+        destructive
+        testId="reagents-delete"
+        onConfirm={async () => {
+          if (!deleting) return;
+          try {
+            await apiFetch(`/reagents/${deleting.id}`, {
+              method: 'DELETE',
+              token,
+            });
+            toast.success(`已删除 ${deleting.name}`);
+            setDeleting(null);
+            await refresh();
+          } catch (e: any) {
+            toast.error(e.message ?? '删除失败');
+            throw e;
+          }
+        }}
       />
     </div>
   );

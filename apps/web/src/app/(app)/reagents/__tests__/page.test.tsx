@@ -274,4 +274,35 @@ describe('/reagents page', () => {
       ).not.toBeInTheDocument();
     });
   });
+
+  it('删除试剂 → DELETE /reagents/{id} + toast 含试剂名', async () => {
+    const { toast } = await import('sonner');
+    mockApiFetch.mockImplementation(async (path: string, opts?: any) => {
+      if (path.startsWith('/reagents') && !opts?.method)
+        return reagentsFixture;
+      if (opts?.method === 'DELETE' && path === '/reagents/r1') return {};
+      throw new Error(`unmocked ${opts?.method ?? 'GET'} ${path}`);
+    });
+
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    renderWithQuery(<ReagentsPage />);
+    await waitFor(() => screen.getByText('乙醇'));
+
+    await user.click(screen.getByTestId('reagents-row-r1-actions'));
+    await user.click(screen.getByTestId('reagents-row-r1-delete'));
+
+    await user.click(screen.getByTestId('reagents-delete-confirm'));
+
+    await waitFor(() => {
+      expect(mockApiFetch).toHaveBeenCalledWith(
+        '/reagents/r1',
+        expect.objectContaining({ method: 'DELETE' }),
+      );
+      expect(
+        (toast.success as any).mock.calls.some((c: any[]) =>
+          String(c[0]).includes('乙醇'),
+        ),
+      ).toBe(true);
+    });
+  });
 });
