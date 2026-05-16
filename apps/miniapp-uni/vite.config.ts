@@ -9,6 +9,7 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: {
         '@': resolve(__dirname, 'src'),
+        '@app/shared': resolve(__dirname, '../../packages/shared/src/index.ts'),
       },
     },
     plugins: [uni()],
