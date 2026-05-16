@@ -82,4 +82,17 @@ export default {
     newPurchase: '新建采购申请',
     empty: '暂无申请',
   },
+  approvals: {
+    useTab: '领用',
+    purchaseTab: '采购',
+    emptyUse: '暂无待审批',
+    emptyPurchase: '暂无待审批批次',
+    remark: '备注 / 拒绝理由',
+    approve1: '一审通过',
+    reject1: '一审拒绝',
+    approve2: '二审通过',
+    reject2: '二审拒绝',
+    controlled: '管控',
+    batch: '批次',
+  },
 };

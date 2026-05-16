@@ -82,4 +82,17 @@ export default {
     newPurchase: 'New purchase request',
     empty: 'No requests',
   },
+  approvals: {
+    useTab: 'Use',
+    purchaseTab: 'Purchase',
+    emptyUse: 'No pending approvals',
+    emptyPurchase: 'No pending batches',
+    remark: 'Comment / rejection reason',
+    approve1: 'Approve L1',
+    reject1: 'Reject L1',
+    approve2: 'Approve L2',
+    reject2: 'Reject L2',
+    controlled: 'Controlled',
+    batch: 'Batch',
+  },
 };
