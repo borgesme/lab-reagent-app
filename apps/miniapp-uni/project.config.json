@@ -1,0 +1,25 @@
+{
+  "miniprogramRoot": "dist/dev/mp-weixin/",
+  "projectname": "lab-reagent-miniapp-uni",
+  "description": "Lab Reagent Miniapp (uniapp)",
+  "appid": "touristappid",
+  "setting": {
+    "urlCheck": false,
+    "es6": false,
+    "enhance": true,
+    "postcss": false,
+    "minified": false,
+    "newFeature": true,
+    "autoAudits": false,
+    "coverView": true,
+    "showShadowRootInWxmlPanel": true
+  },
+  "compileType": "miniprogram",
+  "libVersion": "2.19.4",
+  "packOptions": { "ignore": [] },
+  "debugOptions": { "hidedInDevtools": [] },
+  "scripts": {},
+  "staticServerOptions": { "baseURL": "", "servePath": "" },
+  "editorSetting": { "tabIndent": "insertSpaces", "tabSize": 2 },
+  "condition": {}
+}
