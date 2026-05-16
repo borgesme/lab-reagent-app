@@ -1,13 +1,13 @@
 <template>
   <view class="page">
-    <NavBar :title="$t('common.login')" showBack />
+    <NavBar :title="$t('common.login')" />
     <view class="content p-32">
       <view class="card">
         <u-form labelPosition="top">
-          <u-form-item label="Email">
+          <u-form-item :label="$t('form.email')">
             <u-input v-model="form.email" placeholder="admin@lab.local" />
           </u-form-item>
-          <u-form-item label="Password">
+          <u-form-item :label="$t('form.password')">
             <u-input
               v-model="form.password"
               type="password"
@@ -47,7 +47,7 @@ async function onLogin() {
     const u = await authApi.me();
     auth.setSession(tokens, u);
     uni.showToast({ title: i18n.global.t('toast.success'), icon: 'success' });
-    setTimeout(() => uni.switchTab({ url: '/pages/home/index' }), 300);
+    setTimeout(() => uni.navigateTo({ url: '/pages/home/index' }), 300);
   } catch {
     /* api/request.ts 已 toast */
   } finally {
