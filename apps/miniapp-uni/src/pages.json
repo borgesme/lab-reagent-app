@@ -66,6 +66,15 @@
         "navigationStyle": "custom",
         "app-plus": { "titleNView": false }
       }
+    },
+    {
+      "path": "pages/report-summary/index",
+      "style": {
+        "navigationBarTitleText": "报表概览",
+        "enablePullDownRefresh": false,
+        "navigationStyle": "custom",
+        "app-plus": { "titleNView": false }
+      }
     }
   ],
   "easycom": {
