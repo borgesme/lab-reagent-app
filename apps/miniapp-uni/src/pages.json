@@ -1,23 +1,37 @@
 {
   "pages": [
     {
-      "path": "pages/login/index",
-      "style": {
-        "navigationBarTitleText": "登录",
-        "enablePullDownRefresh": false,
-        "navigationStyle": "custom",
-        "app-plus": {
-          "titleNView": false,
-          "popGesture": "none",
-          "bounce": "none"
-        }
-      }
-    },
-    {
       "path": "pages/home/index",
       "style": {
         "navigationBarTitleText": "工作台",
         "enablePullDownRefresh": false,
+        "navigationStyle": "custom",
+        "app-plus": { "titleNView": false }
+      }
+    },
+    {
+      "path": "pages/my-requests/index",
+      "style": {
+        "navigationBarTitleText": "我的申请",
+        "enablePullDownRefresh": true,
+        "navigationStyle": "custom",
+        "app-plus": { "titleNView": false }
+      }
+    },
+    {
+      "path": "pages/approvals/index",
+      "style": {
+        "navigationBarTitleText": "待办审批",
+        "enablePullDownRefresh": true,
+        "navigationStyle": "custom",
+        "app-plus": { "titleNView": false }
+      }
+    },
+    {
+      "path": "pages/notifications/index",
+      "style": {
+        "navigationBarTitleText": "消息",
+        "enablePullDownRefresh": true,
         "navigationStyle": "custom",
         "app-plus": { "titleNView": false }
       }
@@ -29,6 +43,19 @@
         "enablePullDownRefresh": false,
         "navigationStyle": "custom",
         "app-plus": { "titleNView": false }
+      }
+    },
+    {
+      "path": "pages/login/index",
+      "style": {
+        "navigationBarTitleText": "登录",
+        "enablePullDownRefresh": false,
+        "navigationStyle": "custom",
+        "app-plus": {
+          "titleNView": false,
+          "popGesture": "none",
+          "bounce": "none"
+        }
       }
     }
   ],
