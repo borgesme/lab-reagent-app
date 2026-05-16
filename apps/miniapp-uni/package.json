@@ -40,6 +40,7 @@
     "@dcloudio/uni-stacktracey": "3.0.0-alpha-4080620251107001",
     "@dcloudio/vite-plugin-uni": "3.0.0-alpha-4080620251107001",
     "@types/node": "^20.11.30",
+    "@vitejs/plugin-vue": "^6.0.7",
     "@vue/test-utils": "^2.4.6",
     "@vue/tsconfig": "^0.5.1",
     "cross-env": "^7.0.3",
