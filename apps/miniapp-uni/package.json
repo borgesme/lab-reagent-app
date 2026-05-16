@@ -1,0 +1,52 @@
+{
+  "name": "@app/miniapp-uni",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Lab reagent miniapp (uniapp + Vue3 + TS, refactor of @app/miniapp)",
+  "scripts": {
+    "dev:h5": "uni",
+    "dev:mp-weixin": "uni -p mp-weixin",
+    "dev:mp-alipay": "uni -p mp-alipay",
+    "dev:app": "uni -p app",
+    "dev:mp-baidu": "uni -p mp-baidu",
+    "dev:mp-toutiao": "uni -p mp-toutiao",
+    "dev:mp-qq": "uni -p mp-qq",
+    "build:h5": "uni build",
+    "build:mp-weixin": "uni build -p mp-weixin",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@app/shared": "workspace:*",
+    "@dcloudio/uni-app": "3.0.0-alpha-4080620251107001",
+    "@dcloudio/uni-app-plus": "3.0.0-alpha-4080620251107001",
+    "@dcloudio/uni-components": "3.0.0-alpha-4080620251107001",
+    "@dcloudio/uni-h5": "3.0.0-alpha-4080620251107001",
+    "@dcloudio/uni-mp-alipay": "3.0.0-alpha-4080620251107001",
+    "@dcloudio/uni-mp-baidu": "3.0.0-alpha-4080620251107001",
+    "@dcloudio/uni-mp-qq": "3.0.0-alpha-4080620251107001",
+    "@dcloudio/uni-mp-toutiao": "3.0.0-alpha-4080620251107001",
+    "@dcloudio/uni-mp-weixin": "3.0.0-alpha-4080620251107001",
+    "@dcloudio/uni-quickapp-webview": "3.0.0-alpha-4080620251107001",
+    "pinia": "^3.0.4",
+    "pinia-plugin-persistedstate": "^4.7.1",
+    "vue": "^3.5.13",
+    "vue-i18n": "^9.14.5"
+  },
+  "devDependencies": {
+    "@dcloudio/types": "^3.4.8",
+    "@dcloudio/uni-automator": "3.0.0-alpha-4080620251107001",
+    "@dcloudio/uni-cli-shared": "3.0.0-alpha-4080620251107001",
+    "@dcloudio/uni-stacktracey": "3.0.0-alpha-4080620251107001",
+    "@dcloudio/vite-plugin-uni": "3.0.0-alpha-4080620251107001",
+    "@types/node": "^20.11.30",
+    "@vue/test-utils": "^2.4.6",
+    "@vue/tsconfig": "^0.5.1",
+    "cross-env": "^7.0.3",
+    "jsdom": "^24.0.0",
+    "sass": "^1.63.2",
+    "typescript": "^5.4.5",
+    "vite": "5.2.8",
+    "vitest": "^1.6.0"
+  }
+}
