@@ -75,4 +75,11 @@ export default {
     aboutContent: '实验室试剂 v0.1.0',
     confirmLogout: '确认退出登录？',
   },
+  myRequests: {
+    useTab: '领用申请',
+    purchaseTab: '采购申请',
+    newUse: '新建领用申请',
+    newPurchase: '新建采购申请',
+    empty: '暂无申请',
+  },
 };

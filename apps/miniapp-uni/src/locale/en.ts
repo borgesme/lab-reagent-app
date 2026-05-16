@@ -75,4 +75,11 @@ export default {
     aboutContent: 'Lab Reagents v0.1.0',
     confirmLogout: 'Confirm log out?',
   },
+  myRequests: {
+    useTab: 'Use request',
+    purchaseTab: 'Purchase request',
+    newUse: 'New use request',
+    newPurchase: 'New purchase request',
+    empty: 'No requests',
+  },
 };
