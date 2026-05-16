@@ -57,6 +57,15 @@
           "bounce": "none"
         }
       }
+    },
+    {
+      "path": "pages/search/index",
+      "style": {
+        "navigationBarTitleText": "搜索试剂",
+        "enablePullDownRefresh": false,
+        "navigationStyle": "custom",
+        "app-plus": { "titleNView": false }
+      }
     }
   ],
   "easycom": {
