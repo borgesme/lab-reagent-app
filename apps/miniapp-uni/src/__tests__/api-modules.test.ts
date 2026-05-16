@@ -40,16 +40,18 @@ describe('api/modules path + method 契约', () => {
 
   it('requests.decide POST /requests/:id/approvals', async () => {
     const calls = captureRequest();
-    await requestsApi.decide('req-1', { decision: 'APPROVE' });
+    await requestsApi.decide('req-1', { action: 'APPROVE', level: 1 });
     expect(calls[0].url).toMatch(/\/requests\/req-1\/approvals$/);
     expect(calls[0].method).toBe('POST');
-    expect(calls[0].data.decision).toBe('APPROVE');
+    expect(calls[0].data.action).toBe('APPROVE');
+    expect(calls[0].data.level).toBe(1);
   });
 
   it('purchases.decideBatch POST /purchases/batches/:id/approve', async () => {
     const calls = captureRequest();
-    await purchasesApi.decideBatch('b-1', { decision: 'REJECT', comment: '不行' });
+    await purchasesApi.decideBatch('b-1', { action: 'REJECT', comment: '不行' });
     expect(calls[0].url).toMatch(/\/purchases\/batches\/b-1\/approve$/);
+    expect(calls[0].data.action).toBe('REJECT');
   });
 
   it('notifications.readAll POST /notifications/read-all', async () => {

@@ -2,13 +2,13 @@ import { apiRequest } from '../request';
 
 export interface CreatePurchaseDto {
   reagentId: string;
-  amount: number;
+  quantity: string;
   unit: string;
-  reason?: string;
+  reason: string;
 }
 
 export interface DecideBatchDto {
-  decision: 'APPROVE' | 'REJECT';
+  action: 'APPROVE' | 'REJECT';
   comment?: string;
 }
 

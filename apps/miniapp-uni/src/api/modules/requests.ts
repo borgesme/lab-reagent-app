@@ -2,13 +2,17 @@ import { apiRequest } from '../request';
 
 export interface CreateRequestDto {
   reagentId: string;
-  amount: number;
+  stockId: string;
+  quantity: string;
   unit: string;
-  reason?: string;
+  purpose: string;
+  projectRef?: string;
+  useLocation?: string;
 }
 
 export interface DecideRequestDto {
-  decision: 'APPROVE' | 'REJECT';
+  action: 'APPROVE' | 'REJECT';
+  level?: 1 | 2;
   comment?: string;
 }
 
