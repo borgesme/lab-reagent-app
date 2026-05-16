@@ -1,4 +1,6 @@
 import { vi, beforeEach } from 'vitest';
+import { createApp } from 'vue';
+import { pinia } from './src/stores';
 
 const storage = new Map<string, any>();
 
@@ -26,9 +28,15 @@ const mockUni = {
 
 (globalThis as any).uni = mockUni;
 
+// pinia plugins only register into `_p` after `app.use(pinia)`; vitest never
+// runs createApp, so we install pinia into a throw-away app here so plugins
+// (e.g. persistedstate) actually take effect for every test.
+createApp({}).use(pinia);
+
 beforeEach(() => {
   storage.clear();
   Object.values(mockUni).forEach((fn: any) => {
     if (typeof fn?.mockClear === 'function') fn.mockClear();
   });
 });
+
