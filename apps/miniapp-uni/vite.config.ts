@@ -4,6 +4,7 @@ import uni from '@dcloudio/vite-plugin-uni';
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd());
+
   return {
     base: env.VITE_ROUTER_BASE || '/',
     resolve: {
@@ -31,6 +32,13 @@ export default defineConfig(({ mode }) => {
       port: 3003,
       open: true,
       hmr: true,
-    },
-  };
+      proxy: {
+        '/api': {
+          target: env.VITE_BASE_URL,
+          changeOrigin: true,
+          rewrite: (path: any) => path.replace(/^\/api/, '')
+        }
+      }
+    }
+  }
 });
