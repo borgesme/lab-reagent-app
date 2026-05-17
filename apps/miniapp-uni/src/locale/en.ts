@@ -13,6 +13,7 @@ export default {
     back: 'Back',
     login: 'Log in',
     unassigned: 'Unassigned',
+    empty: 'No data',
   },
   toast: {
     loading: 'Loading...',

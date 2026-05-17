@@ -13,6 +13,7 @@ export default {
     back: '返回',
     login: '登录',
     unassigned: '未分配',
+    empty: '暂无数据',
   },
   toast: {
     loading: '加载中...',
