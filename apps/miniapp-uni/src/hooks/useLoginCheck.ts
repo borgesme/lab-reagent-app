@@ -5,7 +5,7 @@ export function useLoginCheck() {
 
   function checkLogin(
     callback: () => void | Promise<void>,
-    url = '/pages/login/index',
+    url = '/pages-sub/login/index',
   ) {
     if (!auth.tokens?.accessToken) {
       uni.navigateTo({ url });

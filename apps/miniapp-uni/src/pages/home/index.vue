@@ -130,7 +130,7 @@ async function refreshUnread() {
 onShow(() => refreshUnread());
 
 function goLogin() {
-  uni.navigateTo({ url: '/pages/login/index' });
+  uni.navigateTo({ url: '/pages-sub/login/index' });
 }
 function goMyRequests() {
   uni.reLaunch({ url: '/pages/my-requests/index' });
@@ -139,10 +139,10 @@ function goApprovals() {
   uni.reLaunch({ url: '/pages/approvals/index' });
 }
 function goSearchPage() {
-  uni.navigateTo({ url: '/pages/search/index' });
+  uni.navigateTo({ url: '/pages-sub/search/index' });
 }
 function goReportSummary() {
-  uni.navigateTo({ url: '/pages/report-summary/index' });
+  uni.navigateTo({ url: '/pages-sub/report-summary/index' });
 }
 function goNotifications() {
   uni.reLaunch({ url: '/pages/notifications/index' });
@@ -150,7 +150,7 @@ function goNotifications() {
 function goSearch() {
   const q = keyword.value.trim();
   uni.navigateTo({
-    url: `/pages/search/index${q ? `?q=${encodeURIComponent(q)}` : ''}`,
+    url: `/pages-sub/search/index${q ? `?q=${encodeURIComponent(q)}` : ''}`,
   });
 }
 </script>

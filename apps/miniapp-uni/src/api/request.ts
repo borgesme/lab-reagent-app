@@ -106,14 +106,14 @@ export async function apiRequest<T = any>(
     }
     useAuth().clear();
     uni.showToast({ title: t('toast.sessionExpired'), icon: 'none' });
-    uni.reLaunch({ url: '/pages/login/index' });
+    uni.reLaunch({ url: '/pages-sub/login/index' });
     throw new ApiError(401, 'session expired');
   }
 
   if (body.code === 403) {
     useAuth().clear();
     uni.showToast({ title: t('toast.sessionExpired'), icon: 'none' });
-    uni.reLaunch({ url: '/pages/login/index' });
+    uni.reLaunch({ url: '/pages-sub/login/index' });
     throw new ApiError(403, body.msg ?? 'forbidden');
   }
 

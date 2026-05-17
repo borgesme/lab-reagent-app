@@ -268,11 +268,11 @@ function onLocaleSelect(item: { locale: LocaleKey }) {
 function confirmLogout() {
   auth.clear();
   logoutShow.value = false;
-  uni.reLaunch({ url: '/pages/login/index' });
+  uni.reLaunch({ url: '/pages-sub/login/index' });
 }
 
 function goLogin() {
-  uni.navigateTo({ url: '/pages/login/index' });
+  uni.navigateTo({ url: '/pages-sub/login/index' });
 }
 </script>
 

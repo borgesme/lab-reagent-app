@@ -44,37 +44,44 @@
         "navigationStyle": "custom",
         "app-plus": { "titleNView": false }
       }
-    },
+    }
+  ],
+  "subPackages": [
     {
-      "path": "pages/login/index",
-      "style": {
-        "navigationBarTitleText": "登录",
-        "enablePullDownRefresh": false,
-        "navigationStyle": "custom",
-        "app-plus": {
-          "titleNView": false,
-          "popGesture": "none",
-          "bounce": "none"
+      "root": "pages-sub",
+      "pages": [
+        {
+          "path": "login/index",
+          "style": {
+            "navigationBarTitleText": "登录",
+            "enablePullDownRefresh": false,
+            "navigationStyle": "custom",
+            "app-plus": {
+              "titleNView": false,
+              "popGesture": "none",
+              "bounce": "none"
+            }
+          }
+        },
+        {
+          "path": "search/index",
+          "style": {
+            "navigationBarTitleText": "搜索试剂",
+            "enablePullDownRefresh": false,
+            "navigationStyle": "custom",
+            "app-plus": { "titleNView": false }
+          }
+        },
+        {
+          "path": "report-summary/index",
+          "style": {
+            "navigationBarTitleText": "报表概览",
+            "enablePullDownRefresh": false,
+            "navigationStyle": "custom",
+            "app-plus": { "titleNView": false }
+          }
         }
-      }
-    },
-    {
-      "path": "pages/search/index",
-      "style": {
-        "navigationBarTitleText": "搜索试剂",
-        "enablePullDownRefresh": false,
-        "navigationStyle": "custom",
-        "app-plus": { "titleNView": false }
-      }
-    },
-    {
-      "path": "pages/report-summary/index",
-      "style": {
-        "navigationBarTitleText": "报表概览",
-        "enablePullDownRefresh": false,
-        "navigationStyle": "custom",
-        "app-plus": { "titleNView": false }
-      }
+      ]
     }
   ],
   "easycom": {

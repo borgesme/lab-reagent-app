@@ -80,7 +80,7 @@ describe('apiRequest 错误路径', () => {
     ]);
     await expect(apiRequest('/x')).rejects.toMatchObject({ code: 403 });
     expect(useAuth().tokens).toBeNull();
-    expect(uni.reLaunch).toHaveBeenCalledWith({ url: '/pages/login/index' });
+    expect(uni.reLaunch).toHaveBeenCalledWith({ url: '/pages-sub/login/index' });
   });
 });
 
@@ -134,7 +134,7 @@ describe('apiRequest 401 + tryRefresh', () => {
     });
     await expect(apiRequest('/me')).rejects.toMatchObject({ code: 401 });
     expect(useAuth().tokens).toBeNull();
-    expect(uni.reLaunch).toHaveBeenCalledWith({ url: '/pages/login/index' });
+    expect(uni.reLaunch).toHaveBeenCalledWith({ url: '/pages-sub/login/index' });
   });
 
   it('并发 401:tryRefresh 只触发一次', async () => {

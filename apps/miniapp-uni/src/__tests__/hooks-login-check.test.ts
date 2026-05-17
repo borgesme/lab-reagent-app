@@ -11,12 +11,12 @@ beforeEach(() => {
 });
 
 describe('useLoginCheck', () => {
-  it('未登录 → navigateTo /pages/login/index，不调 callback', () => {
+  it('未登录 → navigateTo /pages-sub/login/index，不调 callback', () => {
     const { checkLogin } = useLoginCheck();
     const cb = vi.fn();
     checkLogin(cb);
     expect(cb).not.toHaveBeenCalled();
-    expect(uni.navigateTo).toHaveBeenCalledWith({ url: '/pages/login/index' });
+    expect(uni.navigateTo).toHaveBeenCalledWith({ url: '/pages-sub/login/index' });
   });
 
   it('已登录 → 调 callback，不导航', () => {
