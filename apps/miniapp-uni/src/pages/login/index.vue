@@ -57,13 +57,14 @@ async function onLogin() {
 </script>
 
 <style lang="scss" scoped>
+@import '@/styles/tokens.scss';
 .page {
   min-height: 100vh;
-  background: #f5f5f5;
+  background: $mp-color-bg;
 }
 .card {
-  background: #fff;
-  border-radius: 16rpx;
-  padding: 32rpx;
+  background: $mp-color-card;
+  border-radius: $mp-radius-md;
+  padding: $mp-spacing-4; // login 单独保留 32rpx
 }
 </style>

@@ -474,36 +474,37 @@ onPullDownRefresh(async () => {
 </script>
 
 <style lang="scss" scoped>
+@import '@/styles/tokens.scss';
 .page {
   min-height: 100vh;
-  background: #f5f5f5;
+  background: $mp-color-bg;
   padding-bottom: 120rpx;
 }
 .tabs-bar {
-  background: #fff;
-  border-radius: 16rpx;
+  background: $mp-color-card;
+  border-radius: $mp-radius-md;
   overflow: hidden;
 }
 .card {
-  background: #fff;
-  border-radius: 16rpx;
-  padding: 24rpx;
+  background: $mp-color-card;
+  border-radius: $mp-radius-md;
+  padding: $mp-spacing-3;
 }
 .form-title {
-  font-size: 30rpx;
+  font-size: $mp-text-lg;
   font-weight: 600;
-  color: #1f2937;
+  color: $mp-color-text-primary;
 }
 .controlled-hint {
   margin-top: 12rpx;
-  font-size: 24rpx;
-  color: #ef4444;
+  font-size: $mp-text-sm;
+  color: $mp-color-error;
 }
 .req-card {
-  background: #fff;
-  border-radius: 16rpx;
-  padding: 24rpx;
-  margin-top: 16rpx;
+  background: $mp-color-card;
+  border-radius: $mp-radius-md;
+  padding: $mp-spacing-3;
+  margin-top: $mp-spacing-2;
 }
 .row-between {
   display: flex;
@@ -511,31 +512,31 @@ onPullDownRefresh(async () => {
   align-items: center;
 }
 .req-name {
-  font-size: 28rpx;
+  font-size: $mp-text-md;
   font-weight: 600;
-  color: #1f2937;
+  color: $mp-color-text-primary;
 }
 .req-status {
-  font-size: 22rpx;
-  color: #6b7280;
+  font-size: $mp-text-xs;
+  color: $mp-color-text-tertiary;
 }
 .status-PENDING {
-  color: #d97706;
+  color: $mp-color-warn;
 }
 .status-APPROVED,
 .status-ISSUED,
 .status-CLOSED,
 .status-MERGED {
-  color: #10b981;
+  color: $mp-color-primary;
 }
 .status-REJECTED,
 .status-CANCELLED {
-  color: #ef4444;
+  color: $mp-color-error;
 }
 .req-line {
-  margin-top: 8rpx;
-  font-size: 24rpx;
-  color: #4b5563;
+  margin-top: $mp-spacing-1;
+  font-size: $mp-text-sm;
+  color: $mp-color-text-secondary;
 }
 .block {
   display: block;
@@ -543,6 +544,6 @@ onPullDownRefresh(async () => {
 .empty {
   display: flex;
   justify-content: center;
-  padding: 64rpx 0;
+  padding: $mp-spacing-8 0;
 }
 </style>

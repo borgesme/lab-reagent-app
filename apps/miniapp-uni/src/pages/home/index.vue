@@ -1,7 +1,7 @@
 <template>
   <view class="page">
     <NavBar :title="$t('pageTitle.home')" />
-    <view class="content p-32">
+    <view class="content p-24">
       <view v-if="user" class="card user-card">
         <text class="user-name block">{{ user.name }}</text>
         <text class="user-email block">{{ user.email }}</text>
@@ -156,52 +156,57 @@ function goSearch() {
 </script>
 
 <style lang="scss" scoped>
+@import '@/styles/tokens.scss';
 .page {
   min-height: 100vh;
-  background: #f5f5f5;
+  background: $mp-color-bg;
   padding-bottom: 120rpx;
 }
 .card {
-  background: #fff;
-  border-radius: 16rpx;
-  padding: 32rpx;
+  background: $mp-color-card;
+  border-radius: $mp-radius-md;
+  padding: $mp-spacing-3;
 }
 .user-card {
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  background: linear-gradient(
+    135deg,
+    $mp-color-primary 0%,
+    $mp-color-primary-dark 100%
+  );
   color: #fff;
 }
 .user-name {
-  font-size: 36rpx;
+  font-size: $mp-text-xl;
   font-weight: bold;
   color: #fff;
 }
 .user-email {
-  margin-top: 8rpx;
-  font-size: 26rpx;
+  margin-top: $mp-spacing-1;
+  font-size: $mp-text-base;
   color: rgba(255, 255, 255, 0.85);
 }
 .user-lab {
-  margin-top: 8rpx;
-  font-size: 24rpx;
+  margin-top: $mp-spacing-1;
+  font-size: $mp-text-sm;
   color: rgba(255, 255, 255, 0.75);
 }
 .block {
   display: block;
 }
 .entries {
-  background: #fff;
-  border-radius: 16rpx;
+  background: $mp-color-card;
+  border-radius: $mp-radius-md;
   overflow: hidden;
 }
 .unread {
-  background: #fff;
-  border-radius: 16rpx;
-  padding: 24rpx 32rpx;
+  background: $mp-color-card;
+  border-radius: $mp-radius-md;
+  padding: $mp-spacing-3 $mp-spacing-4;
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 .unread-text {
-  font-size: 28rpx;
+  font-size: $mp-text-md;
 }
 </style>

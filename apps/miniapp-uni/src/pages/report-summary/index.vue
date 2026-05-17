@@ -187,41 +187,42 @@ onShow(() => loadAll());
 </script>
 
 <style lang="scss" scoped>
+@import '@/styles/tokens.scss';
 .page {
   min-height: 100vh;
-  background: #f5f5f5;
+  background: $mp-color-bg;
   padding-bottom: 120rpx;
 }
 .report-card {
-  background: #fff;
-  border-radius: 16rpx;
-  padding: 32rpx;
-  margin-top: 16rpx;
+  background: $mp-color-card;
+  border-radius: $mp-radius-md;
+  padding: $mp-spacing-3;
+  margin-top: $mp-spacing-2;
 }
 .report-label {
-  font-size: 26rpx;
-  color: #6b7280;
+  font-size: $mp-text-base;
+  color: $mp-color-text-tertiary;
 }
 .report-value {
   display: block;
-  margin-top: 16rpx;
-  font-size: 48rpx;
+  margin-top: $mp-spacing-2;
+  font-size: $mp-text-2xl;
   font-weight: bold;
-  color: #1f2937;
+  color: $mp-color-text-primary;
 }
 .report-loading {
-  margin-top: 16rpx;
+  margin-top: $mp-spacing-2;
 }
 .report-error {
-  margin-top: 16rpx;
+  margin-top: $mp-spacing-2;
 }
 .error-text {
-  color: #d4380d;
-  font-size: 26rpx;
+  color: $mp-color-error-dark;
+  font-size: $mp-text-base;
 }
 .muted {
-  color: #9ca3af;
-  font-size: 26rpx;
+  color: $mp-color-text-muted;
+  font-size: $mp-text-base;
 }
 .empty {
   display: flex;

@@ -96,35 +96,36 @@ onLoad((options: any) => {
 </script>
 
 <style lang="scss" scoped>
+@import '@/styles/tokens.scss';
 .page {
   min-height: 100vh;
-  background: #f5f5f5;
+  background: $mp-color-bg;
 }
 .card {
-  background: #fff;
-  border-radius: 16rpx;
-  padding: 16rpx 24rpx;
+  background: $mp-color-card;
+  border-radius: $mp-radius-md;
+  padding: $mp-spacing-2 $mp-spacing-3;
 }
 .reagent-card {
-  background: #fff;
-  border-radius: 16rpx;
-  padding: 24rpx;
-  margin-top: 16rpx;
+  background: $mp-color-card;
+  border-radius: $mp-radius-md;
+  padding: $mp-spacing-3;
+  margin-top: $mp-spacing-2;
 }
 .reagent-head {
   display: flex;
   align-items: center;
-  gap: 16rpx;
+  gap: $mp-spacing-2;
 }
 .reagent-name {
-  font-size: 30rpx;
+  font-size: $mp-text-lg;
   font-weight: 600;
-  color: #1f2937;
+  color: $mp-color-text-primary;
 }
 .reagent-meta {
-  margin-top: 8rpx;
-  font-size: 24rpx;
-  color: #6b7280;
+  margin-top: $mp-spacing-1;
+  font-size: $mp-text-sm;
+  color: $mp-color-text-tertiary;
 }
 .block {
   display: block;
@@ -132,6 +133,6 @@ onLoad((options: any) => {
 .empty {
   display: flex;
   justify-content: center;
-  padding: 64rpx 0;
+  padding: $mp-spacing-8 0;
 }
 </style>

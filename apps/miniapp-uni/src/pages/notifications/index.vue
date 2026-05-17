@@ -97,34 +97,35 @@ onPullDownRefresh(async () => {
 </script>
 
 <style lang="scss" scoped>
+@import '@/styles/tokens.scss';
 .page {
   min-height: 100vh;
-  background: #f5f5f5;
+  background: $mp-color-bg;
   padding-bottom: 120rpx;
 }
 .noti-card {
-  background: #fafafa;
-  border-radius: 16rpx;
-  padding: 24rpx;
-  margin-top: 16rpx;
+  background: $mp-color-card-alt;
+  border-radius: $mp-radius-md;
+  padding: $mp-spacing-3;
+  margin-top: $mp-spacing-2;
 }
 .noti-card.unread {
-  background: #fffbe6;
+  background: $mp-color-card-unread;
 }
 .noti-title {
-  font-size: 28rpx;
+  font-size: $mp-text-md;
   font-weight: 600;
-  color: #1f2937;
+  color: $mp-color-text-primary;
 }
 .noti-body {
-  margin-top: 8rpx;
-  font-size: 26rpx;
-  color: #4b5563;
+  margin-top: $mp-spacing-1;
+  font-size: $mp-text-base;
+  color: $mp-color-text-secondary;
 }
 .noti-meta {
-  margin-top: 8rpx;
-  font-size: 22rpx;
-  color: #9ca3af;
+  margin-top: $mp-spacing-1;
+  font-size: $mp-text-xs;
+  color: $mp-color-text-muted;
 }
 .block {
   display: block;
@@ -132,6 +133,6 @@ onPullDownRefresh(async () => {
 .empty {
   display: flex;
   justify-content: center;
-  padding: 64rpx 0;
+  padding: $mp-spacing-8 0;
 }
 </style>

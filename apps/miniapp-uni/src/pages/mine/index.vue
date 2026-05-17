@@ -276,55 +276,60 @@ function goLogin() {
 </script>
 
 <style lang="scss" scoped>
+@import '@/styles/tokens.scss';
 .page {
   min-height: 100vh;
-  background: #f5f5f5;
+  background: $mp-color-bg;
   padding-bottom: 120rpx;
 }
 .card {
-  background: #fff;
-  border-radius: 16rpx;
-  padding: 32rpx;
+  background: $mp-color-card;
+  border-radius: $mp-radius-md;
+  padding: $mp-spacing-4; // mine 头部 user-card 保留 32rpx
 }
 .user-card {
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  background: linear-gradient(
+    135deg,
+    $mp-color-primary 0%,
+    $mp-color-primary-dark 100%
+  );
   color: #fff;
 }
 .user-name {
-  font-size: 36rpx;
+  font-size: $mp-text-xl;
   font-weight: bold;
   color: #fff;
 }
 .user-email {
-  margin-top: 8rpx;
-  font-size: 26rpx;
+  margin-top: $mp-spacing-1;
+  font-size: $mp-text-base;
   color: rgba(255, 255, 255, 0.85);
 }
 .user-roles {
-  margin-top: 8rpx;
-  font-size: 24rpx;
+  margin-top: $mp-spacing-1;
+  font-size: $mp-text-sm;
   color: rgba(255, 255, 255, 0.75);
 }
 .cell-card {
-  background: #fff;
-  border-radius: 16rpx;
+  background: $mp-color-card;
+  border-radius: $mp-radius-md;
   overflow: hidden;
 }
 .block {
   display: block;
 }
 .popup-body {
-  padding: 32rpx;
+  padding: $mp-spacing-4;
 }
 .popup-title {
-  font-size: 32rpx;
+  font-size: $mp-text-md;
   font-weight: 600;
-  color: #1f2937;
+  color: $mp-color-text-primary;
 }
 .popup-actions {
   display: flex;
-  gap: 16rpx;
-  margin-top: 32rpx;
+  gap: $mp-spacing-2;
+  margin-top: $mp-spacing-4;
 }
 .popup-actions :deep(.u-button) {
   flex: 1;

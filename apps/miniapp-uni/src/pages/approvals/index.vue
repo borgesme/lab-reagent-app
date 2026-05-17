@@ -285,21 +285,22 @@ onPullDownRefresh(() => refresh());
 </script>
 
 <style lang="scss" scoped>
+@import '@/styles/tokens.scss';
 .page {
   min-height: 100vh;
-  background: #f5f5f5;
+  background: $mp-color-bg;
   padding-bottom: 120rpx;
 }
 .tabs-bar {
-  background: #fff;
-  border-radius: 16rpx;
+  background: $mp-color-card;
+  border-radius: $mp-radius-md;
   overflow: hidden;
 }
 .approval-card {
-  background: #fff;
-  border-radius: 16rpx;
-  padding: 24rpx;
-  margin-top: 16rpx;
+  background: $mp-color-card;
+  border-radius: $mp-radius-md;
+  padding: $mp-spacing-3;
+  margin-top: $mp-spacing-2;
 }
 .row-between {
   display: flex;
@@ -307,27 +308,27 @@ onPullDownRefresh(() => refresh());
   align-items: center;
 }
 .approval-title {
-  font-size: 28rpx;
+  font-size: $mp-text-md;
   font-weight: 600;
-  color: #1f2937;
+  color: $mp-color-text-primary;
 }
 .tag-controlled {
-  color: #ef4444;
+  color: $mp-color-error;
   font-weight: normal;
-  font-size: 24rpx;
+  font-size: $mp-text-sm;
 }
 .approval-meta {
-  margin-top: 8rpx;
-  font-size: 24rpx;
-  color: #4b5563;
+  margin-top: $mp-spacing-1;
+  font-size: $mp-text-sm;
+  color: $mp-color-text-secondary;
 }
 .batch-items {
-  margin-top: 8rpx;
-  padding: 8rpx 0;
+  margin-top: $mp-spacing-1;
+  padding: $mp-spacing-1 0;
 }
 .batch-line {
-  font-size: 24rpx;
-  color: #6b7280;
+  font-size: $mp-text-sm;
+  color: $mp-color-text-tertiary;
 }
 .btn-row {
   display: flex;
@@ -340,6 +341,6 @@ onPullDownRefresh(() => refresh());
 .empty {
   display: flex;
   justify-content: center;
-  padding: 64rpx 0;
+  padding: $mp-spacing-8 0;
 }
 </style>
