@@ -1,14 +1,49 @@
+/* 启用 Flex 布局 */
 .flex { display: flex; }
-.flex-row { display: flex; flex-direction: row; }
-.flex-col { display: flex; flex-direction: column; }
-.flex-1 { flex: 1; }
-.flex-center { display: flex; justify-content: center; align-items: center; }
-.items-center { align-items: center; }
-.items-start { align-items: flex-start; }
-.items-end { align-items: flex-end; }
+
+/* flex-direction - 主轴方向 */
+.flex-row { flex-direction: row; }
+.flex-row-reverse { flex-direction: row-reverse; }
+.flex-col { flex-direction: column; }
+.flex-col-reverse { flex-direction: column-reverse; }
+
+/* justify-content - 主轴对齐 */
+.justify-start { justify-content: flex-start; }
+.justify-end { justify-content: flex-end; }
 .justify-center { justify-content: center; }
 .justify-between { justify-content: space-between; }
-.justify-end { justify-content: flex-end; }
-.gap-8 { gap: 8rpx; }
-.gap-16 { gap: 16rpx; }
-.gap-24 { gap: 24rpx; }
+.justify-around { justify-content: space-around; }
+.justify-evenly { justify-content: space-evenly; }
+.justify-stretch { justify-content: stretch; }
+.justify-normal { justify-content: normal; }
+
+/* align-items - 交叉轴对齐 */
+.items-start { align-items: flex-start; }
+.items-end { align-items: flex-end; }
+.items-center { align-items: center; }
+.items-baseline { align-items: baseline; }
+.items-stretch { align-items: stretch; }
+
+/* flex-wrap - 换行 */
+.flex-nowrap { flex-wrap: nowrap; }
+.flex-wrap { flex-wrap: wrap; }
+.flex-wrap-reverse { flex-wrap: wrap-reverse; }
+
+/* 4. Flex - 伸缩比例 */
+.flex-1 { flex: 1 1 0%; }
+.flex-auto { flex: 1 1 auto; }
+.flex-initial { flex: 0 1 auto; }
+.flex-none { flex: none; }
+
+/* 5. flex-grow - 放大比例 */
+.grow { flex-grow: 1; }
+.grow-0 { flex-grow: 0; }
+
+/* 6. Flex Shrink - 缩小比例 */
+.shrink { flex-shrink: 1; }
+.shrink-0 { flex-shrink: 0; }
+
+// 定义百分比宽高
+.w-full { width: 100%; }
+.h-full { height: 100%; }
+.min-h-full { height: 100%; }
