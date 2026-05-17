@@ -14,106 +14,122 @@
       </view>
 
       <view v-if="tab === 'use'" class="tab-pane mt-16">
-        <view v-if="reqs.length === 0" class="empty">
-          <u-empty :text="$t('approvals.emptyUse')" />
+        <Skeleton v-if="reqsLoading" :count="3" :rows="2" />
+        <ErrorPlaceholder
+          v-else-if="reqsError"
+          :message="reqsError || undefined"
+          @retry="refresh"
+        />
+        <view v-else-if="reqs.length === 0" class="empty">
+          <u-empty :text="$t('common.empty')" />
         </view>
-        <view v-for="r in reqs" :key="r.id" class="approval-card">
-          <view class="row-between">
-            <text class="approval-title">
-              {{ r.reagent?.name ?? r.reagentId }}
-              <text v-if="isControlled(r)" class="tag-controlled">
-                【{{ $t('approvals.controlled') }}】
+        <view v-else>
+          <view v-for="r in reqs" :key="r.id" class="approval-card">
+            <view class="row-between">
+              <text class="approval-title">
+                {{ r.reagent?.name ?? r.reagentId }}
+                <text v-if="isControlled(r)" class="tag-controlled">
+                  【{{ $t('approvals.controlled') }}】
+                </text>
               </text>
+            </view>
+            <text class="approval-meta block">
+              {{ r.applicant?.name ?? r.applicantId }} · {{ r.quantity }}
+              {{ r.unit }}
             </text>
-          </view>
-          <text class="approval-meta block">
-            {{ r.applicant?.name ?? r.applicantId }} · {{ r.quantity }}
-            {{ r.unit }}
-          </text>
-          <text class="approval-meta block">
-            {{ $t('form.purpose') }}：{{ r.purpose }}
-          </text>
-          <u-textarea
-            v-model="comments[r.id]"
-            :placeholder="$t('approvals.remark')"
-            :count="false"
-            :autoHeight="true"
-            class="mt-8"
-          />
-          <view class="btn-row mt-8">
-            <u-button
-              size="mini"
-              type="primary"
-              :text="$t('approvals.approve1')"
-              @click="decideUse(r.id, 'APPROVE', 1)"
+            <text class="approval-meta block">
+              {{ $t('form.purpose') }}：{{ r.purpose }}
+            </text>
+            <u-textarea
+              v-model="comments[r.id]"
+              :placeholder="$t('approvals.remark')"
+              :count="false"
+              :autoHeight="true"
+              class="mt-8"
             />
-            <u-button
-              size="mini"
-              :text="$t('approvals.reject1')"
-              @click="decideUse(r.id, 'REJECT', 1)"
-            />
-            <template v-if="isControlled(r)">
+            <view class="btn-row mt-8">
               <u-button
                 size="mini"
                 type="primary"
-                :text="$t('approvals.approve2')"
-                @click="decideUse(r.id, 'APPROVE', 2)"
+                :text="$t('approvals.approve1')"
+                @click="decideUse(r.id, 'APPROVE', 1)"
               />
               <u-button
                 size="mini"
-                :text="$t('approvals.reject2')"
-                @click="decideUse(r.id, 'REJECT', 2)"
+                :text="$t('approvals.reject1')"
+                @click="decideUse(r.id, 'REJECT', 1)"
               />
-            </template>
+              <template v-if="isControlled(r)">
+                <u-button
+                  size="mini"
+                  type="primary"
+                  :text="$t('approvals.approve2')"
+                  @click="decideUse(r.id, 'APPROVE', 2)"
+                />
+                <u-button
+                  size="mini"
+                  :text="$t('approvals.reject2')"
+                  @click="decideUse(r.id, 'REJECT', 2)"
+                />
+              </template>
+            </view>
           </view>
         </view>
       </view>
 
       <view v-else class="tab-pane mt-16">
-        <view v-if="batchList.length === 0" class="empty">
-          <u-empty :text="$t('approvals.emptyPurchase')" />
+        <Skeleton v-if="purLoading" :count="3" :rows="2" />
+        <ErrorPlaceholder
+          v-else-if="purError"
+          :message="purError || undefined"
+          @retry="refresh"
+        />
+        <view v-else-if="batchList.length === 0" class="empty">
+          <u-empty :text="$t('common.empty')" />
         </view>
-        <view
-          v-for="g in batchList"
-          :key="g.batch.id"
-          class="approval-card"
-        >
-          <text class="approval-title block">
-            {{ $t('approvals.batch') }} {{ g.batch.id }}
-          </text>
-          <text class="approval-meta block">
-            {{ $t('form.reagent') }} {{ g.batch.reagentId }} ·
-            {{ g.batch.totalQty }} {{ g.batch.unit }}
-          </text>
-          <view class="batch-items">
-            <text
-              v-for="i in g.items"
-              :key="i.id"
-              class="batch-line block"
-            >
-              - {{ i.applicant?.name ?? i.applicantId }}: {{ i.quantity }}
-              {{ i.unit }}（{{ i.reason }}）
+        <view v-else>
+          <view
+            v-for="g in batchList"
+            :key="g.batch.id"
+            class="approval-card"
+          >
+            <text class="approval-title block">
+              {{ $t('approvals.batch') }} {{ g.batch.id }}
             </text>
-          </view>
-          <u-textarea
-            v-model="comments[g.batch.id]"
-            :placeholder="$t('approvals.remark')"
-            :count="false"
-            :autoHeight="true"
-            class="mt-8"
-          />
-          <view class="btn-row mt-8">
-            <u-button
-              size="mini"
-              type="primary"
-              :text="$t('common.approve')"
-              @click="decideBatch(g.batch.id, 'APPROVE')"
+            <text class="approval-meta block">
+              {{ $t('form.reagent') }} {{ g.batch.reagentId }} ·
+              {{ g.batch.totalQty }} {{ g.batch.unit }}
+            </text>
+            <view class="batch-items">
+              <text
+                v-for="i in g.items"
+                :key="i.id"
+                class="batch-line block"
+              >
+                - {{ i.applicant?.name ?? i.applicantId }}: {{ i.quantity }}
+                {{ i.unit }}（{{ i.reason }}）
+              </text>
+            </view>
+            <u-textarea
+              v-model="comments[g.batch.id]"
+              :placeholder="$t('approvals.remark')"
+              :count="false"
+              :autoHeight="true"
+              class="mt-8"
             />
-            <u-button
-              size="mini"
-              :text="$t('common.reject')"
-              @click="decideBatch(g.batch.id, 'REJECT')"
-            />
+            <view class="btn-row mt-8">
+              <u-button
+                size="mini"
+                type="primary"
+                :text="$t('common.approve')"
+                @click="decideBatch(g.batch.id, 'APPROVE')"
+              />
+              <u-button
+                size="mini"
+                :text="$t('common.reject')"
+                @click="decideBatch(g.batch.id, 'REJECT')"
+              />
+            </view>
           </view>
         </view>
       </view>
@@ -125,12 +141,14 @@
 
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue';
-import { onShow } from '@dcloudio/uni-app';
+import { onShow, onPullDownRefresh } from '@dcloudio/uni-app';
 import NavBar from '@/components/nav-bar/nav-bar.vue';
 import TabBar from '@/components/tab-bar/tab-bar.vue';
 import CustomBottomArea from '@/components/custom-bottom-area/custom-bottom-area.vue';
 import * as requestsApi from '@/api/modules/requests';
 import * as purchasesApi from '@/api/modules/purchases';
+import Skeleton from '@/components/skeleton/skeleton.vue';
+import ErrorPlaceholder from '@/components/error-placeholder/error-placeholder.vue';
 import { i18n } from '@/locale';
 
 interface Reagent {
@@ -182,6 +200,10 @@ function onTabClick(item: any) {
   tab.value = item.index === 0 ? 'use' : 'purchase';
 }
 
+const reqsLoading = ref(true);
+const reqsError = ref<string | null>(null);
+const purLoading = ref(true);
+const purError = ref<string | null>(null);
 const reqs = ref<ReqRow[]>([]);
 const groups = ref<Record<string, BatchGroup>>({});
 const comments = reactive<Record<string, string>>({});
@@ -195,6 +217,10 @@ function isControlled(r: ReqRow) {
 }
 
 async function refresh() {
+  reqsLoading.value = true;
+  reqsError.value = null;
+  purLoading.value = true;
+  purError.value = null;
   try {
     const [r, p] = await Promise.all([
       requestsApi.listPending(),
@@ -208,8 +234,18 @@ async function refresh() {
       g[item.batch.id].items.push(item);
     }
     groups.value = g;
-  } catch {
-    /* 401 已 toast */
+  } catch (e: any) {
+    const msg = e?.message ?? '加载失败';
+    reqsError.value = msg;
+    purError.value = msg;
+  } finally {
+    reqsLoading.value = false;
+    purLoading.value = false;
+    try {
+      uni.stopPullDownRefresh();
+    } catch {
+      /* H5 无此 API */
+    }
   }
 }
 
@@ -245,6 +281,7 @@ async function decideBatch(batchId: string, action: 'APPROVE' | 'REJECT') {
 }
 
 onShow(() => refresh());
+onPullDownRefresh(() => refresh());
 </script>
 
 <style lang="scss" scoped>

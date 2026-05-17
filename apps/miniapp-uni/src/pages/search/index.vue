@@ -12,26 +12,34 @@
       </view>
 
       <view class="mt-24">
-        <view v-if="list.loading.value === 'empty'" class="empty">
-          <u-empty :text="$t('toast.noResults')" />
+        <Skeleton v-if="list.loadingFlag.value" :count="3" :rows="2" />
+        <ErrorPlaceholder
+          v-else-if="list.loading.value === 'error'"
+          :message="list.lastError.value || undefined"
+          @retry="list.retry"
+        />
+        <view v-else-if="list.loading.value === 'empty'" class="empty">
+          <u-empty :text="$t('common.empty')" />
         </view>
-        <view
-          v-for="r in list.dataList.value"
-          :key="r.id"
-          class="reagent-card"
-        >
-          <view class="reagent-head">
-            <text class="reagent-name">{{ r.name }}</text>
-            <u-tag
-              v-if="isControlled(r)"
-              type="error"
-              text="管控"
-              plain
-              size="mini"
-            />
+        <view v-else>
+          <view
+            v-for="r in list.dataList.value"
+            :key="r.id"
+            class="reagent-card"
+          >
+            <view class="reagent-head">
+              <text class="reagent-name">{{ r.name }}</text>
+              <u-tag
+                v-if="isControlled(r)"
+                type="error"
+                text="管控"
+                plain
+                size="mini"
+              />
+            </view>
+            <text v-if="r.cas" class="reagent-meta block">CAS: {{ r.cas }}</text>
+            <text class="reagent-meta block">等级: {{ r.hazardLevel }}</text>
           </view>
-          <text v-if="r.cas" class="reagent-meta block">CAS: {{ r.cas }}</text>
-          <text class="reagent-meta block">等级: {{ r.hazardLevel }}</text>
         </view>
       </view>
     </view>
@@ -43,6 +51,8 @@ import { ref } from 'vue';
 import { onLoad } from '@dcloudio/uni-app';
 import NavBar from '@/components/nav-bar/nav-bar.vue';
 import * as reagentsApi from '@/api/modules/reagents';
+import Skeleton from '@/components/skeleton/skeleton.vue';
+import ErrorPlaceholder from '@/components/error-placeholder/error-placeholder.vue';
 import { useRefreshList } from '@/hooks/useRefreshList';
 
 interface Reagent {

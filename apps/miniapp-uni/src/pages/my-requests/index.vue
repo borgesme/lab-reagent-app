@@ -68,28 +68,36 @@
         </view>
 
         <view class="mt-16">
-          <view v-if="reqList.loading.value === 'empty'" class="empty">
-            <u-empty :text="$t('myRequests.empty')" />
+          <Skeleton v-if="reqList.loadingFlag.value" :count="3" :rows="2" />
+          <ErrorPlaceholder
+            v-else-if="reqList.loading.value === 'error'"
+            :message="reqList.lastError.value || undefined"
+            @retry="reqList.retry"
+          />
+          <view v-else-if="reqList.loading.value === 'empty'" class="empty">
+            <u-empty :text="$t('common.empty')" />
           </view>
-          <view
-            v-for="r in reqList.dataList.value"
-            :key="r.id"
-            class="req-card"
-          >
-            <view class="row-between">
-              <text class="req-name">{{ r.reagent?.name ?? r.reagentId }}</text>
-              <text class="req-status" :class="`status-${r.status}`">
-                {{ r.status }}
-              </text>
-            </view>
-            <text class="req-line block">{{ r.quantity }} {{ r.unit }}</text>
-            <text v-if="r.purpose" class="req-line block">{{ r.purpose }}</text>
-            <view v-if="r.status === 'PENDING'" class="mt-8">
-              <u-button
-                size="mini"
-                :text="$t('common.cancel')"
-                @click="cancelUse(r.id)"
-              />
+          <view v-else>
+            <view
+              v-for="r in reqList.dataList.value"
+              :key="r.id"
+              class="req-card"
+            >
+              <view class="row-between">
+                <text class="req-name">{{ r.reagent?.name ?? r.reagentId }}</text>
+                <text class="req-status" :class="`status-${r.status}`">
+                  {{ r.status }}
+                </text>
+              </view>
+              <text class="req-line block">{{ r.quantity }} {{ r.unit }}</text>
+              <text v-if="r.purpose" class="req-line block">{{ r.purpose }}</text>
+              <view v-if="r.status === 'PENDING'" class="mt-8">
+                <u-button
+                  size="mini"
+                  :text="$t('common.cancel')"
+                  @click="cancelUse(r.id)"
+                />
+              </view>
             </view>
           </view>
         </view>
@@ -139,28 +147,36 @@
         </view>
 
         <view class="mt-16">
-          <view v-if="purList.loading.value === 'empty'" class="empty">
-            <u-empty :text="$t('myRequests.empty')" />
+          <Skeleton v-if="purList.loadingFlag.value" :count="3" :rows="2" />
+          <ErrorPlaceholder
+            v-else-if="purList.loading.value === 'error'"
+            :message="purList.lastError.value || undefined"
+            @retry="purList.retry"
+          />
+          <view v-else-if="purList.loading.value === 'empty'" class="empty">
+            <u-empty :text="$t('common.empty')" />
           </view>
-          <view
-            v-for="p in purList.dataList.value"
-            :key="p.id"
-            class="req-card"
-          >
-            <view class="row-between">
-              <text class="req-name">{{ p.reagent?.name ?? p.reagentId }}</text>
-              <text class="req-status" :class="`status-${p.status}`">
-                {{ p.status }}
-              </text>
-            </view>
-            <text class="req-line block">{{ p.quantity }} {{ p.unit }}</text>
-            <text v-if="p.reason" class="req-line block">{{ p.reason }}</text>
-            <view v-if="p.status === 'PENDING'" class="mt-8">
-              <u-button
-                size="mini"
-                :text="$t('common.cancel')"
-                @click="cancelPurchase(p.id)"
-              />
+          <view v-else>
+            <view
+              v-for="p in purList.dataList.value"
+              :key="p.id"
+              class="req-card"
+            >
+              <view class="row-between">
+                <text class="req-name">{{ p.reagent?.name ?? p.reagentId }}</text>
+                <text class="req-status" :class="`status-${p.status}`">
+                  {{ p.status }}
+                </text>
+              </view>
+              <text class="req-line block">{{ p.quantity }} {{ p.unit }}</text>
+              <text v-if="p.reason" class="req-line block">{{ p.reason }}</text>
+              <view v-if="p.status === 'PENDING'" class="mt-8">
+                <u-button
+                  size="mini"
+                  :text="$t('common.cancel')"
+                  @click="cancelPurchase(p.id)"
+                />
+              </view>
             </view>
           </view>
         </view>
@@ -197,7 +213,7 @@
 
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue';
-import { onShow } from '@dcloudio/uni-app';
+import { onShow, onPullDownRefresh } from '@dcloudio/uni-app';
 import NavBar from '@/components/nav-bar/nav-bar.vue';
 import TabBar from '@/components/tab-bar/tab-bar.vue';
 import CustomBottomArea from '@/components/custom-bottom-area/custom-bottom-area.vue';
@@ -205,6 +221,8 @@ import * as reagentsApi from '@/api/modules/reagents';
 import * as stocksApi from '@/api/modules/stocks';
 import * as requestsApi from '@/api/modules/requests';
 import * as purchasesApi from '@/api/modules/purchases';
+import Skeleton from '@/components/skeleton/skeleton.vue';
+import ErrorPlaceholder from '@/components/error-placeholder/error-placeholder.vue';
 import { useRefreshList } from '@/hooks/useRefreshList';
 import { i18n } from '@/locale';
 
@@ -445,6 +463,7 @@ async function cancelPurchase(id: string) {
 }
 
 onShow(() => refreshAll());
+onPullDownRefresh(() => refreshAll());
 </script>
 
 <style lang="scss" scoped>

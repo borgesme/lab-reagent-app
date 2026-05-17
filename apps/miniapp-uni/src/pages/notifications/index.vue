@@ -10,21 +10,29 @@
       </template>
     </NavBar>
     <view class="content p-24">
-      <view v-if="list.loading.value === 'empty'" class="empty">
-        <u-empty :text="$t('toast.noNotifications')" />
+      <Skeleton v-if="list.loadingFlag.value" :count="3" :rows="2" />
+      <ErrorPlaceholder
+        v-else-if="list.loading.value === 'error'"
+        :message="list.lastError.value || undefined"
+        @retry="list.retry"
+      />
+      <view v-else-if="list.loading.value === 'empty'" class="empty">
+        <u-empty :text="$t('common.empty')" />
       </view>
-      <view
-        v-for="n in list.dataList.value"
-        :key="n.id"
-        class="noti-card"
-        :class="{ unread: !n.readAt }"
-        @click="onTap(n)"
-      >
-        <text class="noti-title">{{ n.title }}</text>
-        <text class="noti-body block">{{ n.body }}</text>
-        <text class="noti-meta block">
-          {{ formatDate(n.createdAt) }}{{ n.readAt ? ' · 已读' : '' }}
-        </text>
+      <view v-else>
+        <view
+          v-for="n in list.dataList.value"
+          :key="n.id"
+          class="noti-card"
+          :class="{ unread: !n.readAt }"
+          @click="onTap(n)"
+        >
+          <text class="noti-title">{{ n.title }}</text>
+          <text class="noti-body block">{{ n.body }}</text>
+          <text class="noti-meta block">
+            {{ formatDate(n.createdAt) }}{{ n.readAt ? ' · 已读' : '' }}
+          </text>
+        </view>
       </view>
     </view>
     <TabBar :current="3" />
@@ -33,11 +41,13 @@
 </template>
 
 <script setup lang="ts">
-import { onShow } from '@dcloudio/uni-app';
+import { onShow, onPullDownRefresh } from '@dcloudio/uni-app';
 import NavBar from '@/components/nav-bar/nav-bar.vue';
 import TabBar from '@/components/tab-bar/tab-bar.vue';
 import CustomBottomArea from '@/components/custom-bottom-area/custom-bottom-area.vue';
 import * as notificationsApi from '@/api/modules/notifications';
+import Skeleton from '@/components/skeleton/skeleton.vue';
+import ErrorPlaceholder from '@/components/error-placeholder/error-placeholder.vue';
 import { useRefreshList } from '@/hooks/useRefreshList';
 
 interface Notification {
@@ -76,6 +86,7 @@ function formatDate(ts: string) {
 }
 
 onShow(() => list.fetchListRefresh());
+onPullDownRefresh(() => list.fetchListRefresh());
 </script>
 
 <style lang="scss" scoped>
