@@ -23,5 +23,7 @@ onHide(() => {});
 </script>
 
 <style lang="scss">
+/* uview-plus 样式引入 input边框 */
+@import '@/uni_modules/uview-plus/index.scss';
 @import '@/styles/index.scss';
 </style>
