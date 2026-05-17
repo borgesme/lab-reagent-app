@@ -4,7 +4,8 @@
       <view class="nav-bar-left" :style="leftSlotStyle">
         <slot name="left">
           <view v-if="showBack" class="nav-bar-back" @click="onBack">
-            <text class="nav-bar-back-icon">‹</text>
+            <!-- <text class="nav-bar-back-icon">‹</text> -->
+            <up-icon name="arrow-left" size="16"></up-icon>
           </view>
         </slot>
       </view>

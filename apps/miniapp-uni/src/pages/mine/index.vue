@@ -92,7 +92,7 @@
     >
       <view class="popup-body">
         <text class="popup-title">{{ $t('mine.changePassword') }}</text>
-        <u-form labelPosition="top" :model="passwordForm" class="mt-16">
+        <u-form labelPosition="top" :model="passwordForm" labelWidth="auto" class="mt-16">
           <u-form-item :label="$t('form.oldPassword')">
             <u-input
               v-model="passwordForm.oldPassword"
