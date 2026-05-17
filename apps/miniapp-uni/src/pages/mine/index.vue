@@ -43,6 +43,7 @@
       <view v-if="user" class="mt-32">
         <u-button
           type="error"
+          shape="circle"
           :text="$t('common.logout')"
           @click="logoutShow = true"
         />

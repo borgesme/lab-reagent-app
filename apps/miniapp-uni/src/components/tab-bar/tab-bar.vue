@@ -18,7 +18,6 @@
         </text>
       </view>
     </view>
-    <view class="safe-area-inset-bottom" />
   </view>
 </template>
 
@@ -91,37 +90,58 @@ function onTap(item: TabItem, index: number) {
 </script>
 
 <style lang="scss" scoped>
+@import '@/styles/tokens.scss';
+
+/* 悬浮容器：左右内缩 + 适配底部安全区 */
 .tab-bar-wrap {
   position: fixed;
+  left: 24rpx;
+  right: 24rpx;
   bottom: 0;
-  left: 0;
-  right: 0;
+  padding-bottom: calc(constant(safe-area-inset-bottom) + 16rpx);
+  padding-bottom: calc(env(safe-area-inset-bottom) + 16rpx);
   z-index: 998;
-  background: #ffffff;
-  box-shadow: 0 -1px 0 rgba(0, 0, 0, 0.04);
 }
+
+/* 苹果玻璃质感 pill bar */
 .tab-bar {
   display: flex;
   align-items: stretch;
-  height: 100rpx;
+  justify-content: space-between;
+  height: 112rpx;
+  padding: 8rpx 12rpx;
+  background: rgba(255, 255, 255, 0.72);
+  border: 2rpx solid rgba(255, 255, 255, 0.9);
+  border-radius: 56rpx;
+  box-shadow:
+    0 12rpx 32rpx rgba(16, 185, 129, 0.14),
+    0 4rpx 12rpx rgba(0, 0, 0, 0.06);
+  backdrop-filter: blur(20rpx) saturate(180%);
+  -webkit-backdrop-filter: blur(20rpx) saturate(180%);
 }
+
 .tab-bar-item {
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6rpx;
+  gap: 4rpx;
+  border-radius: 40rpx;
+  transition: transform 0.15s ease;
 }
+
+.tab-bar-item.active {
+  transform: scale(1.06);
+}
+
 .tab-text {
   font-size: 22rpx;
   color: #909193;
 }
+
 .tab-text.active {
-  color: #10b981;
+  color: $mp-color-primary;
   font-weight: 600;
-}
-.safe-area-inset-bottom {
-  height: env(safe-area-inset-bottom);
 }
 </style>
