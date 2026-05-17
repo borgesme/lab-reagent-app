@@ -86,7 +86,14 @@ function formatDate(ts: string) {
 }
 
 onShow(() => list.fetchListRefresh());
-onPullDownRefresh(() => list.fetchListRefresh());
+onPullDownRefresh(async () => {
+  await list.fetchListRefresh();
+  try {
+    uni.stopPullDownRefresh();
+  } catch {
+    /* H5 无此 API */
+  }
+});
 </script>
 
 <style lang="scss" scoped>

@@ -463,7 +463,14 @@ async function cancelPurchase(id: string) {
 }
 
 onShow(() => refreshAll());
-onPullDownRefresh(() => refreshAll());
+onPullDownRefresh(async () => {
+  await refreshAll();
+  try {
+    uni.stopPullDownRefresh();
+  } catch {
+    /* H5 无此 API */
+  }
+});
 </script>
 
 <style lang="scss" scoped>

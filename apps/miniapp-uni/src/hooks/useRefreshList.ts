@@ -82,15 +82,7 @@ export function useRefreshList<T = any, Q extends Record<string, any> = any>(
     pageNum.value = 1;
     totalRows.value = 0;
     refreshing.value = 'refreshing';
-    try {
-      await fetchListData();
-    } finally {
-      try {
-        uni.stopPullDownRefresh();
-      } catch {
-        /* H5 无此 API */
-      }
-    }
+    await fetchListData();
   }
 
   async function fetchListLoad() {
