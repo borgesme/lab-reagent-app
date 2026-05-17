@@ -43,4 +43,29 @@ describe('useRefreshList', () => {
     expect(list.totalRows.value).toBe(0);
     expect(list.pageNum.value).toBe(1);
   });
+
+  it('API reject → loading=error 且 lastError 含 message', async () => {
+    const api = vi.fn().mockRejectedValue(new Error('boom'));
+    const list = useRefreshList<any>(api);
+    await list.fetchListRefresh();
+    expect(list.loading.value).toBe('error');
+    expect(list.lastError.value).toContain('boom');
+    expect(list.loadingFlag.value).toBe(false);
+    expect(list.refreshing.value).toBe('none');
+  });
+
+  it('retry() 复位状态并重新拉取成功', async () => {
+    const api = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('first fail'))
+      .mockResolvedValueOnce({ items: [{ id: 1 }], total: 1 });
+    const list = useRefreshList<any>(api);
+    await list.fetchListRefresh();
+    expect(list.loading.value).toBe('error');
+    await list.retry();
+    expect(api).toHaveBeenCalledTimes(2);
+    expect(list.dataList.value).toEqual([{ id: 1 }]);
+    expect(list.loading.value).toBe('ended'); // total=1 pageSize=20 → ended
+    expect(list.lastError.value).toBeNull();
+  });
 });

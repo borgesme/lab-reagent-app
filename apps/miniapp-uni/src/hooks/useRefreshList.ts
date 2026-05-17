@@ -1,7 +1,7 @@
 import { ref, type Ref } from 'vue';
 
 export type RefreshState = 'none' | 'refreshing';
-export type LoadState = 'none' | 'loading' | 'empty' | 'ended';
+export type LoadState = 'none' | 'loading' | 'empty' | 'ended' | 'error';
 
 export interface UseRefreshListOpts<T, Q extends Record<string, any> = any> {
   pageSize?: number;
@@ -16,10 +16,12 @@ export interface UseRefreshListReturn<T> {
   totalRows: Ref<number>;
   dataList: Ref<T[]>;
   loadingFlag: Ref<boolean>;
+  lastError: Ref<string | null>;
   fetchListData: () => Promise<void>;
   fetchListRefresh: () => Promise<void>;
   fetchListLoad: () => Promise<void>;
   resetListData: () => void;
+  retry: () => Promise<void>;
 }
 
 export function useRefreshList<T = any, Q extends Record<string, any> = any>(
@@ -41,9 +43,11 @@ export function useRefreshList<T = any, Q extends Record<string, any> = any>(
   const dataList = ref<T[]>([]) as Ref<T[]>;
   const loadingFlag = ref(false);
   const firstFlag = ref(true);
+  const lastError = ref<string | null>(null);
 
   async function fetchListData() {
     if (firstFlag.value) loadingFlag.value = true;
+    lastError.value = null;
     try {
       const params = {
         ...getSearchParams(),
@@ -62,6 +66,10 @@ export function useRefreshList<T = any, Q extends Record<string, any> = any>(
       else loading.value = 'none';
 
       if (refreshing.value === 'refreshing') refreshing.value = 'none';
+    } catch (e: any) {
+      loading.value = 'error';
+      lastError.value = e?.message ?? '加载失败';
+      // 不 rethrow（api/request.ts 已 toast）
     } finally {
       loadingFlag.value = false;
       firstFlag.value = false;
@@ -100,6 +108,16 @@ export function useRefreshList<T = any, Q extends Record<string, any> = any>(
     firstFlag.value = true;
     refreshing.value = 'none';
     loading.value = 'none';
+    lastError.value = null;
+  }
+
+  async function retry() {
+    pageNum.value = 1;
+    totalRows.value = 0;
+    firstFlag.value = true;
+    loading.value = 'none';
+    lastError.value = null;
+    await fetchListData();
   }
 
   return {
@@ -109,9 +127,11 @@ export function useRefreshList<T = any, Q extends Record<string, any> = any>(
     totalRows,
     dataList,
     loadingFlag,
+    lastError,
     fetchListData,
     fetchListRefresh,
     fetchListLoad,
     resetListData,
+    retry,
   };
 }
