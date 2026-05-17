@@ -1,0 +1,39 @@
+// src/styles/tokens.scss
+// Plan E tokens — 用 $mp- 前缀避免与 $uni-* / uview $u-* 命名冲突
+
+// === 颜色 ===
+$mp-color-primary: #10b981;
+$mp-color-primary-dark: #059669;
+$mp-color-bg: #f5f5f5;
+$mp-color-card: #fff;
+$mp-color-card-alt: #fafafa;            // notifications 已读
+$mp-color-card-unread: #fffbe6;         // notifications 未读
+$mp-color-text-primary: #1f2937;
+$mp-color-text-secondary: #4b5563;
+$mp-color-text-tertiary: #6b7280;
+$mp-color-text-muted: #9ca3af;
+$mp-color-error: #ef4444;
+$mp-color-error-dark: #d4380d;
+$mp-color-warn: #d97706;
+
+// === 间距（rpx，8 倍数） ===
+$mp-spacing-1: 8rpx;
+$mp-spacing-2: 16rpx;
+$mp-spacing-3: 24rpx;     // 默认页 / 卡片 padding
+$mp-spacing-4: 32rpx;
+$mp-spacing-6: 48rpx;
+$mp-spacing-8: 64rpx;
+
+// === 圆角 ===
+$mp-radius-sm: 8rpx;
+$mp-radius-md: 16rpx;     // 卡片标准
+$mp-radius-lg: 24rpx;
+
+// === 字号 ===
+$mp-text-xs: 22rpx;       // meta tiny
+$mp-text-sm: 24rpx;       // meta
+$mp-text-base: 26rpx;     // body
+$mp-text-md: 28rpx;       // 卡片标题
+$mp-text-lg: 30rpx;       // 大标题
+$mp-text-xl: 36rpx;       // user-card 名字
+$mp-text-2xl: 48rpx;      // report 大数字
