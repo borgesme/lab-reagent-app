@@ -17,11 +17,7 @@ tests/e2e/.auth/
 
 # Claude Code local settings
 .claude/
+.vscode
 
 # Build info
 *.tsbuildinfo
-
-
-# 参考项目
-apps/Art-app
-apps/uniapp
