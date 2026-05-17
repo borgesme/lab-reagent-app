@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { onLaunch, onShow, onHide } from '@dcloudio/uni-app';
 import { useBootTokenRefresh } from '@/hooks/useBootTokenRefresh';
+import { useMpUpdate } from '@/hooks/useMpUpdate';
 import { useAppStore } from '@/stores/app';
 
 const appStore = useAppStore();
+const { checkUpdate } = useMpUpdate();
 
 onLaunch(() => {
   console.log('App Launch')
@@ -14,7 +16,9 @@ onLaunch(() => {
   appStore.setSystemInfo(systemInfo)
 });
 
-onShow(() => {});
+onShow(() => {
+  checkUpdate();
+});
 onHide(() => {});
 </script>
 
