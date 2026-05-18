@@ -9,5 +9,7 @@ export function createApp() {
   app.use(pinia);
   app.use(uviewPlus);
   app.use(i18n);
+  // mp-weixin 下 globalProperties 不自动透传到模板，手动补挂 $t
+  app.config.globalProperties.$t = i18n.global.t;
   return { app };
 }
