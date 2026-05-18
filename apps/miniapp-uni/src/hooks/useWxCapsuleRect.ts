@@ -16,7 +16,7 @@ export function useWxCapsuleRect() {
 
   function update() {
     try {
-      const si = uni.getSystemInfoSync();
+      const si = uni.getWindowInfo();
       statusBarHeight.value = si.statusBarHeight ?? 0;
       screenWidth.value = (si.screenWidth ?? si.windowWidth) ?? 0;
     } catch {

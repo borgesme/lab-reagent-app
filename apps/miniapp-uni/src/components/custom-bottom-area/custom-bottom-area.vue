@@ -16,7 +16,7 @@ const safeBottom = ref(0);
 
 onMounted(() => {
   try {
-    const insets = uni.getSystemInfoSync().safeAreaInsets;
+    const insets = uni.getWindowInfo().safeAreaInsets;
     safeBottom.value = insets?.bottom ?? 0;
   } catch {
     safeBottom.value = 0;

@@ -15,7 +15,7 @@ export function detectLocale(): LocaleKey {
   }
   let sys = '';
   try {
-    sys = uni.getSystemInfoSync().language ?? '';
+    sys = uni.getAppBaseInfo().language ?? '';
   } catch {
     sys = typeof navigator !== 'undefined' ? navigator.language ?? '' : '';
   }
