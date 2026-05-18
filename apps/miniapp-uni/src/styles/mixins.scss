@@ -1,0 +1,10 @@
+@import './tokens.scss';
+
+@mixin mp-user-card {
+  background: linear-gradient(
+    135deg,
+    $mp-color-primary 0%,
+    $mp-color-primary-dark 100%
+  );
+  color: $mp-color-on-primary;
+}

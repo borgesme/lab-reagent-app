@@ -23,13 +23,11 @@ describe('useWxCapsuleRect', () => {
       width: 87,
       height: 32,
     });
-    const origin = uni.getSystemInfoSync as any;
-    (uni.getSystemInfoSync as any) = () => ({
+    const origin = uni.getWindowInfo as any;
+    (uni.getWindowInfo as any) = () => ({
       statusBarHeight: 20,
       screenWidth: 375,
       windowWidth: 375,
-      language: 'zh-CN',
-      platform: 'devtools',
       safeAreaInsets: { top: 20, bottom: 0, left: 0, right: 0 },
     });
     try {
@@ -40,7 +38,7 @@ describe('useWxCapsuleRect', () => {
       expect(avoidCapsuleStyle.value.paddingTop).toBe('24px');
       expect(alignRightElementStyle.value.position).toBe('absolute');
     } finally {
-      (uni.getSystemInfoSync as any) = origin;
+      (uni.getWindowInfo as any) = origin;
     }
   });
 });

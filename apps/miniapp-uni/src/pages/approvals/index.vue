@@ -222,22 +222,29 @@ async function refresh() {
   purLoading.value = true;
   purError.value = null;
   try {
-    const [r, p] = await Promise.all([
+    const [reqsResult, purResult] = await Promise.allSettled([
       requestsApi.listPending(),
       purchasesApi.listPending(),
     ]);
-    reqs.value = (r as ReqRow[]) ?? [];
-    const g: Record<string, BatchGroup> = {};
-    for (const item of (p as PurRow[]) ?? []) {
-      if (!item.batch || item.batch.status !== 'PENDING') continue;
-      if (!g[item.batch.id]) g[item.batch.id] = { batch: item.batch, items: [] };
-      g[item.batch.id].items.push(item);
+    console.log("🚀 ~ refresh ~ purResult:", purResult)
+
+    if (reqsResult.status === 'fulfilled') {
+      reqs.value = (reqsResult.value as ReqRow[]) ?? [];
+    } else {
+      reqsError.value = reqsResult.reason?.message ?? '加载失败';
     }
-    groups.value = g;
-  } catch (e: any) {
-    const msg = e?.message ?? '加载失败';
-    reqsError.value = msg;
-    purError.value = msg;
+
+    if (purResult.status === 'fulfilled') {
+      const g: Record<string, BatchGroup> = {};
+      for (const item of (purResult.value as PurRow[]) ?? []) {
+        if (!item.batch || item.batch.status !== 'PENDING') continue;
+        if (!g[item.batch.id]) g[item.batch.id] = { batch: item.batch, items: [] };
+        g[item.batch.id].items.push(item);
+      }
+      groups.value = g;
+    } else {
+      purError.value = purResult.reason?.message ?? '加载失败';
+    }
   } finally {
     reqsLoading.value = false;
     purLoading.value = false;

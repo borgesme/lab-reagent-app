@@ -157,6 +157,7 @@ function goSearch() {
 
 <style lang="scss" scoped>
 @import '@/styles/tokens.scss';
+@import '@/styles/mixins.scss';
 .page {
   min-height: 100vh;
   background: $mp-color-bg;
@@ -168,17 +169,12 @@ function goSearch() {
   padding: $mp-spacing-3;
 }
 .user-card {
-  background: linear-gradient(
-    135deg,
-    $mp-color-primary 0%,
-    $mp-color-primary-dark 100%
-  );
-  color: #fff;
+  @include mp-user-card;
 }
 .user-name {
   font-size: $mp-text-xl;
   font-weight: bold;
-  color: #fff;
+  color: $mp-color-on-primary;
 }
 .user-email {
   margin-top: $mp-spacing-1;

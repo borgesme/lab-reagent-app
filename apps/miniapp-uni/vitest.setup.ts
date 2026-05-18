@@ -23,6 +23,16 @@ const mockUni = {
     platform: 'devtools',
     safeAreaInsets: { top: 20, bottom: 0, left: 0, right: 0 },
   })),
+  getWindowInfo: vi.fn(() => ({
+    statusBarHeight: 20,
+    screenWidth: 375,
+    windowWidth: 375,
+    safeAreaInsets: { top: 20, bottom: 0, left: 0, right: 0 },
+  })),
+  getAppBaseInfo: vi.fn(() => ({
+    language: 'zh-CN',
+    platform: 'devtools',
+  })),
   stopPullDownRefresh: vi.fn(),
 };
 
