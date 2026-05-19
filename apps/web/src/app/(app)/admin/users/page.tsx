@@ -1,8 +1,12 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
-import type { ColumnDef } from '@tanstack/react-table';
+import type {
+  ColumnDef,
+  PaginationState,
+  RowSelectionState,
+} from '@tanstack/react-table';
 import { useQueryClient } from '@tanstack/react-query';
-import { MoreHorizontal, Plus } from 'lucide-react';
+import { MoreHorizontal, Plus, Trash2 } from 'lucide-react';
 import { z } from 'zod';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/data/PageHeader';
@@ -39,6 +43,13 @@ interface UserRow {
   lab?: { id?: string; name: string } | null;
   labId?: string | null;
   roles?: Array<{ role: { code: string } }>;
+}
+
+interface PageResult<T> {
+  items: T[];
+  total: number;
+  pageNum: number;
+  pageSize: number;
 }
 
 interface LabRow {
@@ -82,10 +93,33 @@ const createDefaults: CreateValues = {
 export default function UsersPage() {
   const token = useAuth((s) => s.tokens?.accessToken);
   const qc = useQueryClient();
-  const usersQuery = useApiQuery<UserRow[]>('/users', { queryKey: ['users'] });
-  const data = usersQuery.data ?? [];
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: 10,
+  });
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+  const [batchDeleting, setBatchDeleting] = useState(false);
+
+  const usersQuery = useApiQuery<PageResult<UserRow>>('/users/page', {
+    queryKey: ['users', 'page', pagination.pageIndex, pagination.pageSize],
+    params: {
+      pageNum: pagination.pageIndex + 1,
+      pageSize: pagination.pageSize,
+    },
+  });
+  const data = usersQuery.data?.items ?? [];
+  const total = usersQuery.data?.total ?? 0;
+  const pageCount = Math.max(1, Math.ceil(total / pagination.pageSize));
   const loading = usersQuery.isLoading;
-  const refresh = () => qc.invalidateQueries({ queryKey: ['users'] });
+  const refresh = () => {
+    setRowSelection({});
+    qc.invalidateQueries({ queryKey: ['users'] });
+  };
+
+  const selectedIds = useMemo(
+    () => Object.keys(rowSelection).filter((id) => rowSelection[id]),
+    [rowSelection],
+  );
 
   const [editing, setEditing] = useState<UserRow | null>(null);
   const [resetting, setResetting] = useState<UserRow | null>(null);
@@ -192,12 +226,31 @@ export default function UsersPage() {
         title="用户管理"
         subtitle="系统全部用户"
         actions={
-          <Button
-            onClick={() => setCreating(true)}
-            data-testid="admin-users-create-btn"
-          >
-            <Plus className="mr-2 h-4 w-4" /> 添加用户
-          </Button>
+          <div className="flex items-center gap-2">
+            {selectedIds.length > 0 && (
+              <>
+                <span
+                  className="text-sm text-muted-foreground"
+                  data-testid="admin-users-selected-count"
+                >
+                  已选 {selectedIds.length} 项
+                </span>
+                <Button
+                  variant="destructive"
+                  onClick={() => setBatchDeleting(true)}
+                  data-testid="admin-users-batch-delete-btn"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" /> 批量删除
+                </Button>
+              </>
+            )}
+            <Button
+              onClick={() => setCreating(true)}
+              data-testid="admin-users-create-btn"
+            >
+              <Plus className="mr-2 h-4 w-4" /> 添加用户
+            </Button>
+          </div>
         }
       />
       <Card className="p-2">
@@ -207,6 +260,15 @@ export default function UsersPage() {
           loading={loading}
           testId="admin-users-table"
           emptyTitle="暂无用户"
+          enableRowSelection
+          rowSelection={rowSelection}
+          onRowSelectionChange={setRowSelection}
+          getRowId={(row) => row.id}
+          pagination={pagination}
+          onPaginationChange={setPagination}
+          pageCount={pageCount}
+          total={total}
+          manualPagination
         />
       </Card>
 
@@ -372,6 +434,30 @@ export default function UsersPage() {
             await refresh();
           } catch (e: any) {
             toast.error(e.message ?? '删除失败');
+            throw e;
+          }
+        }}
+      />
+
+      <ConfirmDialog
+        open={batchDeleting}
+        onOpenChange={setBatchDeleting}
+        title="批量删除用户"
+        description={`确认删除选中的 ${selectedIds.length} 个用户？该操作会立即吊销其所有登录会话(软删除可在数据库层恢复)。`}
+        confirmLabel="确认删除"
+        destructive
+        testId="admin-users-batch-delete"
+        onConfirm={async () => {
+          try {
+            const res = await apiFetch<{ deleted: number }>(
+              '/users/batch-delete',
+              { method: 'POST', token, body: { ids: selectedIds } },
+            );
+            toast.success(`已删除 ${res.deleted} 个用户`);
+            setBatchDeleting(false);
+            await refresh();
+          } catch (e: any) {
+            toast.error(e.message ?? '批量删除失败');
             throw e;
           }
         }}

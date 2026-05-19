@@ -1,8 +1,12 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
-import type { ColumnDef } from '@tanstack/react-table';
+import type {
+  ColumnDef,
+  PaginationState,
+  RowSelectionState,
+} from '@tanstack/react-table';
 import { useQueryClient } from '@tanstack/react-query';
-import { MoreHorizontal, Plus } from 'lucide-react';
+import { MoreHorizontal, Plus, Trash2 } from 'lucide-react';
 import { z } from 'zod';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/data/PageHeader';
@@ -35,6 +39,13 @@ interface Lab {
   building?: string | null;
 }
 
+interface PageResult<T> {
+  items: T[];
+  total: number;
+  pageNum: number;
+  pageSize: number;
+}
+
 const schema = z.object({
   name: z.string().min(1, '名称必填'),
   building: z.string().optional(),
@@ -47,10 +58,33 @@ const createDefaults: LabValues = { name: '', building: '' };
 export default function LabsPage() {
   const token = useAuth((s) => s.tokens?.accessToken);
   const qc = useQueryClient();
-  const labsQuery = useApiQuery<Lab[]>('/labs', { queryKey: ['labs'] });
-  const data = labsQuery.data ?? [];
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: 10,
+  });
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+  const [batchDeleting, setBatchDeleting] = useState(false);
+
+  const labsQuery = useApiQuery<PageResult<Lab>>('/labs/page', {
+    queryKey: ['labs', 'page', pagination.pageIndex, pagination.pageSize],
+    params: {
+      pageNum: pagination.pageIndex + 1,
+      pageSize: pagination.pageSize,
+    },
+  });
+  const data = labsQuery.data?.items ?? [];
+  const total = labsQuery.data?.total ?? 0;
+  const pageCount = Math.max(1, Math.ceil(total / pagination.pageSize));
   const loading = labsQuery.isLoading;
-  const refresh = () => qc.invalidateQueries({ queryKey: ['labs'] });
+  const refresh = () => {
+    setRowSelection({});
+    qc.invalidateQueries({ queryKey: ['labs'] });
+  };
+
+  const selectedIds = useMemo(
+    () => Object.keys(rowSelection).filter((id) => rowSelection[id]),
+    [rowSelection],
+  );
 
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<Lab | null>(null);
@@ -122,12 +156,31 @@ export default function LabsPage() {
         title="实验室管理"
         subtitle="系统在管实验室"
         actions={
-          <Button
-            onClick={() => setCreating(true)}
-            data-testid="labs-create-btn"
-          >
-            <Plus className="mr-2 h-4 w-4" /> 新增
-          </Button>
+          <div className="flex items-center gap-2">
+            {selectedIds.length > 0 && (
+              <>
+                <span
+                  className="text-sm text-muted-foreground"
+                  data-testid="labs-selected-count"
+                >
+                  已选 {selectedIds.length} 项
+                </span>
+                <Button
+                  variant="destructive"
+                  onClick={() => setBatchDeleting(true)}
+                  data-testid="labs-batch-delete-btn"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" /> 批量删除
+                </Button>
+              </>
+            )}
+            <Button
+              onClick={() => setCreating(true)}
+              data-testid="labs-create-btn"
+            >
+              <Plus className="mr-2 h-4 w-4" /> 新增
+            </Button>
+          </div>
         }
       />
       <Card className="p-2">
@@ -137,6 +190,15 @@ export default function LabsPage() {
           loading={loading}
           testId="labs-table"
           emptyTitle="暂无实验室"
+          enableRowSelection
+          rowSelection={rowSelection}
+          onRowSelectionChange={setRowSelection}
+          getRowId={(row) => row.id}
+          pagination={pagination}
+          onPaginationChange={setPagination}
+          pageCount={pageCount}
+          total={total}
+          manualPagination
         />
       </Card>
 
@@ -284,6 +346,30 @@ export default function LabsPage() {
             await refresh();
           } catch (e: any) {
             toast.error(e.message ?? '删除失败');
+            throw e;
+          }
+        }}
+      />
+
+      <ConfirmDialog
+        open={batchDeleting}
+        onOpenChange={setBatchDeleting}
+        title="批量删除实验室"
+        description={`确认删除选中的 ${selectedIds.length} 个实验室？该操作会软删除，关联的用户与库存不会被级联删除。`}
+        confirmLabel="确认删除"
+        destructive
+        testId="labs-batch-delete"
+        onConfirm={async () => {
+          try {
+            const res = await apiFetch<{ deleted: number }>(
+              '/labs/batch-delete',
+              { method: 'POST', token, body: { ids: selectedIds } },
+            );
+            toast.success(`已删除 ${res.deleted} 个实验室`);
+            setBatchDeleting(false);
+            await refresh();
+          } catch (e: any) {
+            toast.error(e.message ?? '批量删除失败');
             throw e;
           }
         }}

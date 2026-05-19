@@ -33,6 +33,10 @@ const labsFixture = [
   { id: 'lab-2', name: 'Lab B', building: null },
 ];
 
+function pageMatches(path: string, prefix: string) {
+  return path === prefix || path.startsWith(prefix + '?');
+}
+
 describe('/admin/labs page', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -42,11 +46,18 @@ describe('/admin/labs page', () => {
       hydrated: true,
     });
     mockApiFetch.mockImplementation(async (path: string, opts?: any) => {
-      if (path === '/labs' && (!opts || opts.method === undefined))
-        return labsFixture;
+      if (pageMatches(path, '/labs/page') && (!opts || opts.method === undefined))
+        return {
+          items: labsFixture,
+          total: labsFixture.length,
+          pageNum: 1,
+          pageSize: 10,
+        };
       if (opts?.method === 'PATCH') return {};
       if (opts?.method === 'DELETE') return {};
       if (opts?.method === 'POST' && path === '/labs') return { id: 'lab-3' };
+      if (opts?.method === 'POST' && path === '/labs/batch-delete')
+        return { deleted: (opts.body?.ids ?? []).length };
       throw new Error(`unmocked ${opts?.method ?? 'GET'} ${path}`);
     });
   });
@@ -79,7 +90,13 @@ describe('/admin/labs page', () => {
   it('PATCH 失败 → toast.error 且 dialog 不关', async () => {
     const { toast } = await import('sonner');
     mockApiFetch.mockImplementation(async (path: string, opts?: any) => {
-      if (path === '/labs' && (!opts || !opts.method)) return labsFixture;
+      if (pageMatches(path, '/labs/page') && (!opts || !opts.method))
+        return {
+          items: labsFixture,
+          total: labsFixture.length,
+          pageNum: 1,
+          pageSize: 10,
+        };
       if (opts?.method === 'PATCH')
         throw new Error('API 422: validation failed');
       throw new Error('unmocked');
@@ -152,5 +169,41 @@ describe('/admin/labs page', () => {
     await waitFor(() => {
       expect(screen.queryByTestId('labs-create-name')).not.toBeInTheDocument();
     });
+  });
+
+  it('多选 + 批量删除 → POST /labs/batch-delete + ids 列表 + toast', async () => {
+    const { toast } = await import('sonner');
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    renderWithQuery(<LabsPage />);
+    await waitFor(() => screen.getByText('Lab A'));
+
+    await user.click(screen.getByTestId('labs-table-row-lab-1-select'));
+    await user.click(screen.getByTestId('labs-table-row-lab-2-select'));
+    expect(screen.getByTestId('labs-selected-count')).toHaveTextContent(
+      '已选 2 项',
+    );
+
+    await user.click(screen.getByTestId('labs-batch-delete-btn'));
+    await user.click(screen.getByTestId('labs-batch-delete-confirm'));
+
+    await waitFor(() => {
+      const call = mockApiFetch.mock.calls.find(
+        (c) => c[1]?.method === 'POST' && c[0] === '/labs/batch-delete',
+      );
+      expect(call).toBeDefined();
+      expect(call![1].body.ids).toEqual(['lab-1', 'lab-2']);
+      expect(toast.success as any).toHaveBeenCalled();
+    });
+  });
+
+  it('分页接口被调用,query 含 pageNum/pageSize', async () => {
+    renderWithQuery(<LabsPage />);
+    await waitFor(() => screen.getByText('Lab A'));
+    const call = mockApiFetch.mock.calls.find((c) =>
+      String(c[0]).startsWith('/labs/page'),
+    );
+    expect(call).toBeDefined();
+    expect(call![0]).toMatch(/pageNum=1/);
+    expect(call![0]).toMatch(/pageSize=10/);
   });
 });

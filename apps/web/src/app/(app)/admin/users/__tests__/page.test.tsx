@@ -53,6 +53,10 @@ const labsFixture = [
   { id: 'lab-2', name: 'Lab B' },
 ];
 
+function pageMatches(path: string, prefix: string) {
+  return path === prefix || path.startsWith(prefix + '?');
+}
+
 describe('/admin/users page', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -62,14 +66,21 @@ describe('/admin/users page', () => {
       hydrated: true,
     });
     mockApiFetch.mockImplementation(async (path: string, opts?: any) => {
-      if (path === '/users' && (!opts || opts.method === undefined))
-        return usersFixture;
+      if (pageMatches(path, '/users/page') && (!opts || !opts.method))
+        return {
+          items: usersFixture,
+          total: usersFixture.length,
+          pageNum: 1,
+          pageSize: 10,
+        };
       if (path === '/labs') return labsFixture;
       if (opts?.method === 'PATCH') return {};
       if (opts?.method === 'DELETE') return {};
       if (opts?.method === 'POST' && path === '/users') return { id: 'u2' };
       if (opts?.method === 'POST' && path.endsWith('/reset-password'))
         return { tempPassword: 'AbCd1234' };
+      if (opts?.method === 'POST' && path === '/users/batch-delete')
+        return { deleted: (opts.body?.ids ?? []).length };
       throw new Error(`unmocked ${opts?.method ?? 'GET'} ${path}`);
     });
   });
@@ -126,7 +137,13 @@ describe('/admin/users page', () => {
   it('PATCH 失败 → toast.error 且 dialog 不关', async () => {
     const { toast } = await import('sonner');
     mockApiFetch.mockImplementation(async (path: string, opts?: any) => {
-      if (path === '/users' && (!opts || !opts.method)) return usersFixture;
+      if (pageMatches(path, '/users/page') && (!opts || !opts.method))
+        return {
+          items: usersFixture,
+          total: usersFixture.length,
+          pageNum: 1,
+          pageSize: 10,
+        };
       if (path === '/labs') return labsFixture;
       if (opts?.method === 'PATCH')
         throw new Error('API 422: validation failed');
@@ -215,7 +232,13 @@ describe('/admin/users page', () => {
   it('创建失败 → toast.error 且 dialog 不关', async () => {
     const { toast } = await import('sonner');
     mockApiFetch.mockImplementation(async (path: string, opts?: any) => {
-      if (path === '/users' && (!opts || !opts.method)) return usersFixture;
+      if (pageMatches(path, '/users/page') && (!opts || !opts.method))
+        return {
+          items: usersFixture,
+          total: usersFixture.length,
+          pageNum: 1,
+          pageSize: 10,
+        };
       if (path === '/labs') return labsFixture;
       if (opts?.method === 'POST' && path === '/users')
         throw new Error('API 409: email exists');
@@ -244,5 +267,41 @@ describe('/admin/users page', () => {
         screen.queryByTestId('admin-users-create-email'),
       ).toBeInTheDocument();
     });
+  });
+
+  it('多选 + 批量删除 → POST /users/batch-delete + ids 列表 + toast', async () => {
+    const { toast } = await import('sonner');
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    renderWithQuery(<UsersPage />);
+    await waitFor(() => screen.getByText('Alice'));
+
+    await user.click(screen.getByTestId('admin-users-table-row-u1-select'));
+    expect(screen.getByTestId('admin-users-selected-count')).toHaveTextContent(
+      '已选 1 项',
+    );
+
+    await user.click(screen.getByTestId('admin-users-batch-delete-btn'));
+    await user.click(screen.getByTestId('admin-users-batch-delete-confirm'));
+
+    await waitFor(() => {
+      const call = mockApiFetch.mock.calls.find(
+        (c) =>
+          c[1]?.method === 'POST' && c[0] === '/users/batch-delete',
+      );
+      expect(call).toBeDefined();
+      expect(call![1].body.ids).toEqual(['u1']);
+      expect(toast.success as any).toHaveBeenCalled();
+    });
+  });
+
+  it('分页接口被调用,query 含 pageNum/pageSize', async () => {
+    renderWithQuery(<UsersPage />);
+    await waitFor(() => screen.getByText('Alice'));
+    const call = mockApiFetch.mock.calls.find((c) =>
+      String(c[0]).startsWith('/users/page'),
+    );
+    expect(call).toBeDefined();
+    expect(call![0]).toMatch(/pageNum=1/);
+    expect(call![0]).toMatch(/pageSize=10/);
   });
 });
