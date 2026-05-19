@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ColumnDef } from '@tanstack/react-table';
+import type { UseFormReturn } from 'react-hook-form';
 import { MoreHorizontal, Plus } from 'lucide-react';
 import { z } from 'zod';
 import { toast } from 'sonner';
@@ -51,6 +52,7 @@ export default function AlertsConfigPage() {
   const [labs, setLabs] = useState<Lab[]>([]);
   const [loading, setLoading] = useState(true);
   const [formOpen, setFormOpen] = useState(false);
+  const [editing, setEditing] = useState<LabReagentConfigSummary | null>(null);
   const [deleting, setDeleting] = useState<LabReagentConfigSummary | null>(null);
 
   const refresh = useCallback(async () => {
@@ -104,6 +106,9 @@ export default function AlertsConfigPage() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setEditing(row.original)}>
+                编辑
+              </DropdownMenuItem>
               <DropdownMenuItem
                 className="text-destructive"
                 onClick={() => setDeleting(row.original)}
@@ -127,6 +132,98 @@ export default function AlertsConfigPage() {
     }),
     [],
   );
+
+  const editingDefaults = useMemo(
+    () => ({
+      labId: editing?.labId ?? '',
+      reagentId: editing?.reagentId ?? '',
+      safetyStock: editing?.safetyStock ?? '',
+      expireWarningDays: String(editing?.expireWarningDays ?? 30),
+    }),
+    [editing],
+  );
+
+  function renderFields(
+    form: UseFormReturn<z.infer<typeof schema>>,
+    isEdit: boolean,
+  ) {
+    return (
+      <>
+        <FormField
+          control={form.control}
+          name="labId"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>实验室</FormLabel>
+              <Select
+                onValueChange={field.onChange}
+                value={field.value}
+                disabled={isEdit}
+              >
+                <FormControl>
+                  <SelectTrigger><SelectValue placeholder="选择实验室" /></SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {labs.map((l) => (
+                    <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="reagentId"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>试剂</FormLabel>
+              <Select
+                onValueChange={field.onChange}
+                value={field.value}
+                disabled={isEdit}
+              >
+                <FormControl>
+                  <SelectTrigger><SelectValue placeholder="选择试剂" /></SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {reagents.map((r) => (
+                    <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <div className="grid grid-cols-2 gap-3">
+          <FormField
+            control={form.control}
+            name="safetyStock"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>安全阈值</FormLabel>
+                <FormControl><Input {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="expireWarningDays"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>预警天数</FormLabel>
+                <FormControl><Input {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+      </>
+    );
+  }
 
   return (
     <div>
@@ -174,74 +271,42 @@ export default function AlertsConfigPage() {
             throw e;
           }
         }}
-        fields={(form) => (
-          <>
-            <FormField
-              control={form.control}
-              name="labId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>实验室</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger><SelectValue placeholder="选择实验室" /></SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {labs.map((l) => (
-                        <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="reagentId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>试剂</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger><SelectValue placeholder="选择试剂" /></SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {reagents.map((r) => (
-                        <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <div className="grid grid-cols-2 gap-3">
-              <FormField
-                control={form.control}
-                name="safetyStock"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>安全阈值</FormLabel>
-                    <FormControl><Input {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="expireWarningDays"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>预警天数</FormLabel>
-                    <FormControl><Input {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-          </>
-        )}
+        fields={(form) => renderFields(form, false)}
+      />
+
+      <FormDialog
+        open={!!editing}
+        onOpenChange={(o) => !o && setEditing(null)}
+        schema={schema}
+        defaultValues={editingDefaults}
+        title="编辑预警配置"
+        description={
+          editing
+            ? `${labs.find((l) => l.id === editing.labId)?.name ?? editing.labId} · ${
+                reagents.find((r) => r.id === editing.reagentId)?.name ?? editing.reagentId
+              }`
+            : ''
+        }
+        onSubmit={async (values) => {
+          if (!editing) return;
+          try {
+            await apiFetch(`/lab-reagent-configs/${editing.id}`, {
+              method: 'PATCH',
+              token,
+              body: {
+                safetyStock: values.safetyStock,
+                expireWarningDays: Number(values.expireWarningDays) || 30,
+              },
+            });
+            toast.success('已保存');
+            setEditing(null);
+            await refresh();
+          } catch (e: any) {
+            toast.error(e.message ?? '保存失败');
+            throw e;
+          }
+        }}
+        fields={(form) => renderFields(form, true)}
       />
 
       <ConfirmDialog
