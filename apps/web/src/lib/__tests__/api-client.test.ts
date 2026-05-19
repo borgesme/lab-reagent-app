@@ -35,7 +35,9 @@ describe('apiFetch', () => {
       'fetch',
       vi.fn().mockResolvedValue(new Response('err', { status: 500 })),
     );
-    await expect(apiFetch('/x', { token: 'abc' })).rejects.toThrow();
+    await expect(apiFetch('/x', { token: 'abc' })).rejects.toBeInstanceOf(
+      ApiError,
+    );
   });
 
   it('body.code !== 200 抛 ApiError', async () => {
@@ -104,7 +106,9 @@ describe('apiFetch', () => {
       configurable: true,
     });
 
-    await expect(apiFetch('/me', { token: 'a1' })).rejects.toThrow();
+    await expect(apiFetch('/me', { token: 'a1' })).rejects.toBeInstanceOf(
+      ApiError,
+    );
     expect(useAuth.getState().tokens).toBeNull();
     expect(hrefSetter).toHaveBeenCalledWith('/login');
   });
@@ -145,7 +149,9 @@ describe('apiFetch', () => {
       configurable: true,
     });
 
-    await expect(apiFetch('/x', { token: 'a1' })).rejects.toThrow();
+    await expect(apiFetch('/x', { token: 'a1' })).rejects.toBeInstanceOf(
+      ApiError,
+    );
     expect(useAuth.getState().tokens).toBeNull();
   });
 });
