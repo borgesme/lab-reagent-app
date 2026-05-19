@@ -171,4 +171,108 @@ describe('Users', () => {
       .set('Authorization', `Bearer ${adminToken}`);
     expectBizError(r, 404);
   });
+
+  it('GET /users/page 返回分页结构 {items,total,pageNum,pageSize}', async () => {
+    const r = await request(app.getHttpServer())
+      .get('/users/page?pageNum=1&pageSize=5')
+      .set('Authorization', `Bearer ${adminToken}`);
+    const data = expectOk(r);
+    expect(data).toHaveProperty('items');
+    expect(data).toHaveProperty('total');
+    expect(data.pageNum).toBe(1);
+    expect(data.pageSize).toBe(5);
+    expect(Array.isArray(data.items)).toBe(true);
+    expect(data.items.length).toBeLessThanOrEqual(5);
+  });
+
+  it('GET /users/page 默认 pageNum=1 pageSize=10', async () => {
+    const r = await request(app.getHttpServer())
+      .get('/users/page')
+      .set('Authorization', `Bearer ${adminToken}`);
+    const data = expectOk(r);
+    expect(data.pageNum).toBe(1);
+    expect(data.pageSize).toBe(10);
+  });
+
+  it('GET /users/page pageSize > 200 → 400', async () => {
+    const r = await request(app.getHttpServer())
+      .get('/users/page?pageSize=999')
+      .set('Authorization', `Bearer ${adminToken}`);
+    expectBizError(r, 400);
+  });
+
+  it('POST /users/batch-delete 事务全或无 + tokenVersion++', async () => {
+    const a = await request(app.getHttpServer())
+      .post('/users')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        email: 'batch-a@lab.local',
+        name: 'BatchA',
+        password: 'pass1234',
+      });
+    const b = await request(app.getHttpServer())
+      .post('/users')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        email: 'batch-b@lab.local',
+        name: 'BatchB',
+        password: 'pass1234',
+      });
+    const ids = [a.body.data.id, b.body.data.id];
+
+    const prev = await prisma.user.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, tokenVersion: true },
+    });
+
+    const r = await request(app.getHttpServer())
+      .post('/users/batch-delete')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ ids });
+    const data = expectOk(r);
+    expect(data.deleted).toBe(2);
+
+    const after = await prisma.user.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, deletedAt: true, tokenVersion: true },
+    });
+    expect(after.every((u) => u.deletedAt !== null)).toBe(true);
+    const prevMap = new Map(prev.map((u) => [u.id, u.tokenVersion]));
+    expect(after.every((u) => u.tokenVersion === prevMap.get(u.id)! + 1)).toBe(true);
+
+    await prisma.userRole.deleteMany({ where: { userId: { in: ids } } });
+    await prisma.user.deleteMany({ where: { id: { in: ids } } });
+  });
+
+  it('POST /users/batch-delete 部分 id 不存在 → 404 + 不删任何', async () => {
+    const a = await request(app.getHttpServer())
+      .post('/users')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        email: 'partial@lab.local',
+        name: 'Partial',
+        password: 'pass1234',
+      });
+    const aId = a.body.data.id;
+
+    const r = await request(app.getHttpServer())
+      .post('/users/batch-delete')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ ids: [aId, 'non-existent-xxx'] });
+    expectBizError(r, 404);
+
+    const survivor = await prisma.user.findUnique({ where: { id: aId } });
+    expect(survivor?.deletedAt).toBeNull();
+
+    await prisma.userRole.deleteMany({ where: { userId: aId } });
+    await prisma.user.delete({ where: { id: aId } });
+  });
+
+  it('POST /users/batch-delete 空 ids → 400', async () => {
+    const r = await request(app.getHttpServer())
+      .post('/users/batch-delete')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ ids: [] });
+    expectBizError(r, 400);
+  });
 });

@@ -201,3 +201,21 @@ export interface ApiResponse<T = unknown> {
   msg: string;
   data: T | null;
 }
+
+export interface PageQuery {
+  pageNum?: number;
+  pageSize?: number;
+}
+
+export interface PageResult<T> {
+  items: T[];
+  total: number;
+  pageNum: number;
+  pageSize: number;
+}
+
+export interface LabSummary {
+  id: string;
+  name: string;
+  building?: string | null;
+}

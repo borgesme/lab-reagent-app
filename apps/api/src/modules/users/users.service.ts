@@ -7,6 +7,7 @@ import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { PageQueryDto } from './dto/page-query.dto';
 import { RoleCode } from '@prisma/client';
 
 @Injectable()
@@ -19,6 +20,48 @@ export class UsersService {
       include: { roles: { include: { role: true } }, lab: true },
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  async listPaged(q: PageQueryDto) {
+    const pageNum = q.pageNum ?? 1;
+    const pageSize = q.pageSize ?? 10;
+    const where = { deletedAt: null };
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.user.findMany({
+        where,
+        include: { roles: { include: { role: true } }, lab: true },
+        orderBy: { createdAt: 'desc' },
+        skip: (pageNum - 1) * pageSize,
+        take: pageSize,
+      }),
+      this.prisma.user.count({ where }),
+    ]);
+    return { items, total, pageNum, pageSize };
+  }
+
+  async batchDelete(ids: string[]) {
+    const existing = await this.prisma.user.findMany({
+      where: { id: { in: ids }, deletedAt: null },
+      select: { id: true },
+    });
+    if (existing.length !== ids.length) {
+      const found = new Set(existing.map((u) => u.id));
+      const missing = ids.filter((id) => !found.has(id));
+      throw new NotFoundException({
+        code: 'USER_NOT_FOUND',
+        missing,
+      });
+    }
+    const now = new Date();
+    await this.prisma.$transaction(
+      ids.map((id) =>
+        this.prisma.user.update({
+          where: { id },
+          data: { deletedAt: now, tokenVersion: { increment: 1 } },
+        }),
+      ),
+    );
+    return { deleted: ids.length };
   }
 
   async create(dto: CreateUserDto) {
