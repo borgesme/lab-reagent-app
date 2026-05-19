@@ -7,7 +7,7 @@
     "strict": true,
     "jsx": "preserve",
     "sourceMap": true,
-    "resolveJsonModule": true,
+    "resolveJsonModule": false,
     "esModuleInterop": true,
     "lib": ["ES2020", "DOM"],
     "types": ["@dcloudio/types", "vite/client"],
@@ -21,10 +21,7 @@
     "src/**/*.ts",
     "src/**/*.d.ts",
     "src/**/*.vue",
-    "shime-uni.d.ts",
-    "vite.config.ts",
-    "vitest.config.ts",
-    "vitest.setup.ts"
+    "shime-uni.d.ts"
   ],
-  "exclude": ["node_modules", "dist", "unpackage"]
+  "exclude": ["node_modules", "dist", "unpackage", "src/uni_modules"]
 }
