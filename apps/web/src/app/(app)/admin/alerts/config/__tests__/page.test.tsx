@@ -41,6 +41,8 @@ function setupHappy() {
     if (path === '/labs' && !opts?.method) return labsFixture;
     if (opts?.method === 'POST' && path === '/lab-reagent-configs')
       return { id: 'cfg-2' };
+    if (opts?.method === 'PATCH' && path.startsWith('/lab-reagent-configs/'))
+      return { ok: true };
     if (opts?.method === 'DELETE' && path.startsWith('/lab-reagent-configs/'))
       return { ok: true };
     throw new Error(`unmocked ${opts?.method ?? 'GET'} ${path}`);
@@ -154,6 +156,46 @@ describe('/admin/alerts/config page', () => {
         expect.objectContaining({ method: 'DELETE' }),
       );
       expect(toast.success as any).toHaveBeenCalledWith('已删除');
+    });
+  });
+
+  it('编辑 → 预填 + lab/reagent disabled + PATCH 仅 safetyStock/expireWarningDays', async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    render(<AlertsConfigPage />);
+    await waitFor(() => screen.getByText('Lab A'));
+
+    await user.click(screen.getByRole('button', { name: '操作' }));
+    await user.click(screen.getByRole('menuitem', { name: '编辑' }));
+
+    const stock = await screen.findByLabelText('安全阈值');
+    const days = screen.getByLabelText('预警天数');
+    expect(stock).toHaveValue('20');
+    expect(days).toHaveValue('30');
+
+    const triggers = screen.getAllByRole('combobox');
+    expect(triggers[0]).toBeDisabled();
+    expect(triggers[1]).toBeDisabled();
+
+    await user.clear(stock);
+    await user.type(stock, '50');
+    await user.clear(days);
+    await user.type(days, '60');
+
+    await user.click(screen.getByRole('button', { name: '保存' }));
+
+    await waitFor(() => {
+      const patch = mockApiFetch.mock.calls.find(
+        (c) => c[1]?.method === 'PATCH' && c[0] === '/lab-reagent-configs/cfg-1',
+      );
+      expect(patch).toBeDefined();
+      expect(patch![1].body).toEqual({
+        safetyStock: '50',
+        expireWarningDays: 60,
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByLabelText('安全阈值')).not.toBeInTheDocument();
     });
   });
 });
