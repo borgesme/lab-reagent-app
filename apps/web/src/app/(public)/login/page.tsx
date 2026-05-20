@@ -49,7 +49,7 @@ export default function LoginPage() {
         labId: me.labId,
         roles: me.roles as any,
       });
-      router.push('/admin/users');
+      router.push('/');
     } catch (e: any) {
       toast.error(e.message ?? '登录失败');
     }
