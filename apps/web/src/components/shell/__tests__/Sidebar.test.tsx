@@ -46,5 +46,6 @@ describe('Sidebar', () => {
     render(<Sidebar />);
     const link = screen.getByRole('link', { name: '用户' });
     expect(link.getAttribute('aria-current')).toBe('page');
+    expect(link.className).toContain('text-primary');
   });
 });
