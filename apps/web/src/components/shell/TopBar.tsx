@@ -9,6 +9,7 @@ import { SearchTrigger } from './SearchTrigger';
 import { MobileSidebar } from './MobileSidebar';
 import { CommandPalette } from '@/components/search/CommandPalette';
 import { NotificationBell } from '@/components/NotificationBell';
+import { PaletteSwitcher } from './PaletteSwitcher';
 
 export function TopBar() {
   const [mobileOpen, setMobileOpen] = React.useState(false);
@@ -36,6 +37,7 @@ export function TopBar() {
         </div>
         <div className="ml-auto flex items-center gap-1">
           <NotificationBell />
+          <PaletteSwitcher />
           <ThemeToggle />
           <UserMenu />
         </div>
