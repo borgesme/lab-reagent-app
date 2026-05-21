@@ -10,6 +10,8 @@ async function bootstrap() {
   app.setGlobalPrefix('api/v1');
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   app.enableCors({ origin: true, credentials: true });
+  const expressApp = app.getHttpAdapter().getInstance();
+  expressApp.set('trust proxy', 1);
 
   if (process.env.NODE_ENV !== 'production') {
     const config = new DocumentBuilder()
