@@ -3,6 +3,7 @@ import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { LogsModule } from './logs/logs.module';
+import { RedisModule } from './common/redis/redis.module';
 import { HealthController } from './health/health.controller';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -28,6 +29,7 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     LogsModule,
+    RedisModule,
     ScheduleModule.forRoot(),
     PrismaModule,
     AuthModule,
