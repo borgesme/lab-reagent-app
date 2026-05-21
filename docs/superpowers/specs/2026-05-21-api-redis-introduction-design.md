@@ -172,7 +172,7 @@ POST /api/v1/auth/login { email, password }
         refresh = sign({sub, roles, ver, jti:refreshJti}, TTL=7d)
         UPDATE user SET currentRefreshJti = refreshJti
         return { accessToken, refreshToken }
-  → ResponseInterceptor 包 {code:0, data:{...}}
+  → ResponseInterceptor 包 {code:200, data:{...}}
 ```
 
 ### 5.2 受保护请求（含黑名单查询）
@@ -205,7 +205,7 @@ POST /api/v1/auth/logout  Authorization: Bearer <access>
         ok = redis.set(REDIS_KEYS.blacklist(jti), '1', 'EX', ttl)
           true  → 加黑成功
           false → warn 日志，仍 return {ok:true}（接受 ≤15min 安全降级窗口）
-  → ResponseInterceptor → {code:0, data:{ok:true}}
+  → ResponseInterceptor → {code:200, data:{ok:true}}
 ```
 
 不动 refresh：完整登出仍需前端同时清除 access + refresh。这是首期边界。
@@ -274,16 +274,9 @@ POST /api/v1/auth/logout  Authorization: Bearer <access>
 
 ## 7. 测试策略
 
-### 7.1 单元测试（jest，不需要真 redis）
+> **注意：apps/api 工程本身没有任何 `*.spec.ts` 单测文件，全部走 e2e（`*.e2e-spec.ts`）。本期沿用此约定，不引入 unit spec。**
 
-- `redis.service.spec.ts`：mock ioredis 构造函数；覆盖 ready 切换、各操作正常/抛错、`onModuleDestroy`
-- `rate-limit.guard.spec.ts`：mock RedisService + Reflector；覆盖 无装饰 / 整体关 / redis down / 首次 + expire / 未超 / 超限带 Retry-After / `keyBy='ip+body'` 缺字段 / 多装饰器叠加任一超限即 429
-- `jwt.guard.spec.ts`（扩展）：legacy + 开关、`redis.get='1'`、`redis.get=null`、`redis.get=other`
-- `auth.service.spec.ts`（扩展）：`logout` 各分支、`issueTokens` access 含 `jti`
-
-预计 +20 个 it。
-
-### 7.2 e2e（test/jest-e2e.json，需真 redis）
+### 7.1 e2e（test/jest-e2e.json，需真 redis）
 
 新增 `test/auth-redis.e2e-spec.ts`：
 
@@ -291,30 +284,30 @@ POST /api/v1/auth/logout  Authorization: Bearer <access>
 - `beforeEach`：`redis.flushdb()`
 - 用例：
   - logout 后旧 access 立即 401 `TOKEN_REVOKED`
-  - logout 时 RedisService.__disable()：返回 200，旧 access 仍可用（fail-open 验证）
+  - logout 时 `RedisService.__disable()`：返回 200，旧 access 仍可用（fail-open 验证）
   - login 同 IP 60s 内第 11 次 → 429 + `Retry-After` header
   - login 同 email 60s 内第 6 次 → 429（先于 IP 触发）
   - login 不同 email 同 IP 第 10 次 → 200（IP 桶未满）
   - GET /users/me 无 `@RateLimit`：任意频率都 200
   - access 被黑后，refresh 仍能换出新 access（refresh 不受 access 黑名单影响）
 
-预计 7 个 it，< 5s 内跑完。
+预计 1 个 e2e spec 文件、7 个 it，< 5s 内跑完。
 
-### 7.3 跳过策略
+### 7.2 跳过策略
 
 沿用现有"redis 没连上跳过"策略（与 `project_p7_status.md` 的 3 self-skip 一致）。CI 无 redis 时整文件 skip，不爆红；本地 `docker compose up redis` 即可全跑。
 
-### 7.4 不写的测试（YAGNI）
+### 7.3 不写的测试（YAGNI）
 
+- 不写 unit spec（沿用现有约定）
 - 不写 redis 性能 / 吞吐测试
 - 不写重连后限流计数器是否归零的测试（redis 实现细节）
-- 不写 ioredis-mock 全套替身（单测 mock + 真 redis e2e 已够）
+- 不写 ioredis-mock 全套替身（真 redis e2e 已够）
 
 ## 8. 验收清单
 
 实现完成时必须全部通过：
 
-- `pnpm --filter @app/api test` 全绿（含新 unit ~20 个 it）
 - `pnpm --filter @app/api test:e2e` 起 redis 时新文件 7/7 pass；不起 redis 时新文件整体 skip，旧 137 个仍绿
 - `pnpm --filter @app/api build` 无新增 ts error
 - 手动验证：起 redis + curl 登录 → logout → 旧 access 立即 401；连打 11 次登录 → 第 11 次 429
