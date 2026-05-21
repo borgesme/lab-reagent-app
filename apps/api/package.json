@@ -27,6 +27,7 @@
     "class-validator": "0.14.1",
     "csv-stringify": "^6.7.0",
     "exceljs": "^4.4.0",
+    "ioredis": "5.10.1",
     "nestjs-pino": "^4.6.1",
     "passport": "0.7.0",
     "passport-jwt": "4.0.1",
