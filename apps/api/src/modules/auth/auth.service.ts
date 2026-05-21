@@ -8,6 +8,8 @@ import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'crypto';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../../prisma/prisma.service';
+import { RedisService } from '../../common/redis/redis.service';
+import { REDIS_KEYS } from '../../common/redis/redis.constants';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 
@@ -17,6 +19,7 @@ export class AuthService {
     private prisma: PrismaService,
     private jwt: JwtService,
     private cfg: ConfigService,
+    private redis: RedisService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -122,17 +125,26 @@ export class AuthService {
     }
   }
 
+  async logout(jti: string | undefined, exp: number | undefined): Promise<{ ok: true }> {
+    if (!jti || !exp) return { ok: true };
+    const ttl = exp - Math.floor(Date.now() / 1000);
+    if (ttl <= 0) return { ok: true };
+    await this.redis.set(REDIS_KEYS.blacklist(jti), '1', ttl);
+    return { ok: true };
+  }
+
   private async issueTokens(sub: string, roles: string[], ver: number) {
+    const accessJti = randomUUID();
     const accessToken = await this.jwt.signAsync(
-      { sub, roles, ver },
+      { sub, roles, ver, jti: accessJti },
       {
         secret: this.cfg.getOrThrow('JWT_ACCESS_SECRET'),
         expiresIn: this.cfg.get('JWT_ACCESS_TTL') ?? '15m',
       },
     );
-    const jti = randomUUID();
+    const refreshJti = randomUUID();
     const refreshToken = await this.jwt.signAsync(
-      { sub, roles, jti, ver },
+      { sub, roles, jti: refreshJti, ver },
       {
         secret: this.cfg.getOrThrow('JWT_REFRESH_SECRET'),
         expiresIn: this.cfg.get('JWT_REFRESH_TTL') ?? '7d',
@@ -140,7 +152,7 @@ export class AuthService {
     );
     await this.prisma.user.update({
       where: { id: sub },
-      data: { currentRefreshJti: jti },
+      data: { currentRefreshJti: refreshJti },
     });
     return { accessToken, refreshToken };
   }
