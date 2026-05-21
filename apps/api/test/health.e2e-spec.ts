@@ -19,6 +19,7 @@ describe('GET /health', () => {
   it('returns { status: "ok" }', async () => {
     const res = await request(app.getHttpServer()).get('/health');
     const data = expectOk(res);
-    expect(data).toEqual({ status: 'ok' });
+    expect(data).toMatchObject({ status: 'ok' });
+    expect(['up', 'down']).toContain(data.redis);
   });
 });

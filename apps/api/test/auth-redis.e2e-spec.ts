@@ -11,8 +11,11 @@ describe('Auth + Redis (blacklist + rate-limit)', () => {
   let prisma: PrismaService;
   let redis: RedisService;
   let redisOk = false;
+  let originalRateLimit: string | undefined;
 
   beforeAll(async () => {
+    originalRateLimit = process.env.RATE_LIMIT_ENABLED;
+    process.env.RATE_LIMIT_ENABLED = '1';
     const mod = await Test.createTestingModule({ imports: [AppModule] }).compile();
     app = mod.createNestApplication();
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
@@ -36,6 +39,7 @@ describe('Auth + Redis (blacklist + rate-limit)', () => {
 
   afterAll(async () => {
     if (app) await app.close();
+    process.env.RATE_LIMIT_ENABLED = originalRateLimit;
   });
 
   beforeEach(async () => {
