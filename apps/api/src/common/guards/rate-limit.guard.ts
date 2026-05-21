@@ -28,16 +28,11 @@ export class RateLimitGuard implements CanActivate {
   async canActivate(ctx: ExecutionContext): Promise<boolean> {
     if (this.cfg.get('RATE_LIMIT_ENABLED') !== '1') return true;
 
-    const merged = this.reflector.getAllAndMerge<RateLimitOptions>(
+    const opts = this.reflector.getAllAndMerge<RateLimitOptions[]>(
       RATE_LIMIT_KEY,
       [ctx.getHandler(), ctx.getClass()],
     );
-    const opts: RateLimitOptions[] = Array.isArray(merged)
-      ? merged
-      : merged
-      ? [merged]
-      : [];
-    if (opts.length === 0) return true;
+    if (!opts || opts.length === 0) return true;
 
     if (!this.redis.isReady()) {
       this.logger.warn(
@@ -49,20 +44,20 @@ export class RateLimitGuard implements CanActivate {
 
     const req = ctx.switchToHttp().getRequest();
     const res = ctx.switchToHttp().getResponse();
-    const ip = (req.ip || 'unknown') as string;
+    const ip = req.ip || 'unknown';
 
     for (const opt of opts) {
       const keyComponent = this.computeKey(opt, ip, req);
       const redisKey = REDIS_KEYS.rateLimit(opt.scope, keyComponent);
       const n = await this.redis.incr(redisKey);
-      if (n === null) continue;
+      if (n === null) return true;
       if (n === 1) {
         await this.redis.expire(redisKey, opt.windowSec);
       }
       if (n > opt.limit) {
         const ttl = (await this.redis.ttl(redisKey)) ?? opt.windowSec;
         const retryAfter = ttl > 0 ? ttl : opt.windowSec;
-        res.setHeader?.('Retry-After', String(retryAfter));
+        res.setHeader('Retry-After', String(retryAfter));
         throw new HttpException('too many requests', 429);
       }
     }
