@@ -36,6 +36,14 @@ export class AuthController {
     return this.auth.refresh(token);
   }
 
+  @Post('logout')
+  @HttpCode(200)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '登出, 把当前 access token jti 加黑名单' })
+  logout(@Req() req: any) {
+    return this.auth.logout(req.user?.jti, req.user?.exp);
+  }
+
   @Get('me')
   @ApiBearerAuth()
   @ApiOperation({ summary: '当前登录用户资料' })
