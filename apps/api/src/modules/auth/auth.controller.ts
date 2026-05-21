@@ -7,6 +7,7 @@ import { UpdateMeDto } from './dto/update-me.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { Public } from '../../common/decorators/public.decorator';
 import { Audit } from '../../common/decorators/audit.decorator';
+import { RateLimit } from '../../common/decorators/rate-limit.decorator';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -23,6 +24,8 @@ export class AuthController {
   @Public()
   @Post('login')
   @HttpCode(200)
+  @RateLimit({ scope: 'auth:login:ip',      keyBy: 'ip',                          limit: 10, windowSec: 60 })
+  @RateLimit({ scope: 'auth:login:account', keyBy: 'ip+body', bodyField: 'email', limit: 5,  windowSec: 60 })
   @ApiOperation({ summary: '邮箱密码登录, 返回 access/refresh token' })
   login(@Body() dto: LoginDto) {
     return this.auth.login(dto);
@@ -39,6 +42,7 @@ export class AuthController {
   @Post('logout')
   @HttpCode(200)
   @ApiBearerAuth()
+  @RateLimit({ scope: 'auth:logout:ip', keyBy: 'ip', limit: 30, windowSec: 60 })
   @ApiOperation({ summary: '登出, 把当前 access token jti 加黑名单' })
   logout(@Req() req: any) {
     return this.auth.logout(req.user?.jti, req.user?.exp);
