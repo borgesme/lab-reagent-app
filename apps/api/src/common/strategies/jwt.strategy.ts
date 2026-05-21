@@ -15,7 +15,13 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       secretOrKey: cfg.getOrThrow('JWT_ACCESS_SECRET'),
     });
   }
-  async validate(payload: { sub: string; roles: string[]; ver?: number }) {
+  async validate(payload: {
+    sub: string;
+    roles: string[];
+    ver?: number;
+    jti?: string;
+    exp?: number;
+  }) {
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
       select: { tokenVersion: true, deletedAt: true },
@@ -27,6 +33,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     } else if (payload.ver !== user.tokenVersion) {
       throw new UnauthorizedException();
     }
-    return { sub: payload.sub, roles: payload.roles };
+    return {
+      sub: payload.sub,
+      roles: payload.roles,
+      jti: payload.jti,
+      exp: payload.exp,
+    };
   }
 }
