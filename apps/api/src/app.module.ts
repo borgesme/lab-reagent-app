@@ -21,6 +21,7 @@ import { ReportsModule } from './modules/reports/reports.module';
 import { JwtStrategy } from './common/strategies/jwt.strategy';
 import { JwtAuthGuard } from './common/guards/jwt.guard';
 import { RolesGuard } from './common/guards/roles.guard';
+import { RateLimitGuard } from './common/guards/rate-limit.guard';
 import { AuditInterceptor } from './common/interceptors/audit.interceptor';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
@@ -49,6 +50,7 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
   providers: [
     JwtStrategy,
     { provide: APP_FILTER, useClass: HttpExceptionFilter },
+    { provide: APP_GUARD, useClass: RateLimitGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
     { provide: APP_INTERCEPTOR, useClass: ResponseInterceptor },
