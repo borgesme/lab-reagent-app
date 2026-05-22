@@ -25,6 +25,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -71,13 +72,24 @@ const updateSchema = z.object({
 
 type UpdateValues = z.infer<typeof updateSchema>;
 
-const createSchema = z.object({
-  email: z.string().email('邮箱格式不正确'),
-  name: z.string().min(2, '姓名至少 2 个字'),
-  password: z.string().min(8, '密码至少 8 位'),
-  labId: z.string().optional(),
-  roles: z.array(z.string()).min(1, '至少 1 个角色'),
-});
+const createSchema = z
+  .object({
+    email: z.string().email('邮箱格式不正确'),
+    name: z.string().min(2, '姓名至少 2 个字'),
+    password: z.string().min(8, '密码至少 8 位'),
+    passwordConfirm: z.string().min(8, '请再次输入密码'),
+    labId: z.string().optional(),
+    roles: z.array(z.string()).min(1, '至少 1 个角色'),
+  })
+  .superRefine((val, ctx) => {
+    if (val.password !== val.passwordConfirm) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['passwordConfirm'],
+        message: '两次密码不一致',
+      });
+    }
+  });
 
 type CreateValues = z.infer<typeof createSchema>;
 
@@ -85,6 +97,7 @@ const createDefaults: CreateValues = {
   email: '',
   name: '',
   password: '',
+  passwordConfirm: '',
   labId: '',
   roles: ['PLAIN_USER'],
 };
@@ -542,9 +555,26 @@ export default function UsersPage() {
                 <FormItem>
                   <FormLabel>初始密码</FormLabel>
                   <FormControl>
-                    <Input
-                      type="password"
+                    <PasswordInput
                       data-testid="admin-users-create-password"
+                      toggleTestId="admin-users-create-password-toggle"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="passwordConfirm"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>确认密码</FormLabel>
+                  <FormControl>
+                    <PasswordInput
+                      data-testid="admin-users-create-password-confirm"
+                      toggleTestId="admin-users-create-password-confirm-toggle"
                       {...field}
                     />
                   </FormControl>
