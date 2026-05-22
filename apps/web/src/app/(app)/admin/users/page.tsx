@@ -40,9 +40,9 @@ interface UserRow {
   id: string;
   email: string;
   name: string;
-  lab?: { id?: string; name: string } | null;
+  lab?: { id?: string; name: string; building?: string | null } | null;
   labId?: string | null;
-  roles?: Array<{ role: { code: string } }>;
+  roles?: string[];
 }
 
 interface PageResult<T> {
@@ -57,17 +57,16 @@ interface LabRow {
   name: string;
 }
 
-const ALL_ROLES = [
-  'SYS_ADMIN',
-  'LAB_HEAD',
-  'REAGENT_ADMIN',
-  'PLAIN_USER',
-] as const;
+interface RoleOption {
+  id: string;
+  code: string;
+  name: string;
+}
 
 const updateSchema = z.object({
   name: z.string().min(1, '姓名必填'),
   labId: z.string().optional(),
-  roles: z.array(z.enum(ALL_ROLES)).min(1, '至少 1 个角色'),
+  roles: z.array(z.string()).min(1, '至少 1 个角色'),
 });
 
 type UpdateValues = z.infer<typeof updateSchema>;
@@ -77,7 +76,7 @@ const createSchema = z.object({
   name: z.string().min(2, '姓名至少 2 个字'),
   password: z.string().min(8, '密码至少 8 位'),
   labId: z.string().optional(),
-  roles: z.array(z.enum(ALL_ROLES)).min(1, '至少 1 个角色'),
+  roles: z.array(z.string()).min(1, '至少 1 个角色'),
 });
 
 type CreateValues = z.infer<typeof createSchema>;
@@ -135,6 +134,14 @@ export default function UsersPage() {
   const labsQuery = useApiQuery<LabRow[]>('/labs', { queryKey: ['labs'] });
   const labs = labsQuery.data ?? [];
 
+  const rolesQuery = useApiQuery<RoleOption[]>('/roles', {
+    queryKey: ['roles'],
+  });
+  const allRoles = useMemo(
+    () => (rolesQuery.data ?? []).map((r) => r.code),
+    [rolesQuery.data],
+  );
+
   const labOptions = useMemo(
     () => [
       { value: '', label: '无实验室' },
@@ -147,9 +154,9 @@ export default function UsersPage() {
     () => ({
       name: editing?.name ?? '',
       labId: editing?.labId ?? editing?.lab?.id ?? '',
-      roles: ((editing?.roles ?? []).map((r) => r.role.code) as any) ?? [
-        'PLAIN_USER',
-      ],
+      roles: (editing?.roles && editing.roles.length > 0
+        ? editing.roles
+        : ['PLAIN_USER']) as string[],
     }),
     [editing],
   );
@@ -170,9 +177,9 @@ export default function UsersPage() {
       header: '角色',
       cell: ({ row }) => (
         <div className="flex flex-wrap gap-1">
-          {(row.original.roles ?? []).map((r) => (
-            <Badge key={r.role.code} variant="secondary">
-              {r.role.code}
+          {(row.original.roles ?? []).map((code) => (
+            <Badge key={code} variant="secondary">
+              {code}
             </Badge>
           ))}
         </div>
@@ -346,7 +353,7 @@ export default function UsersPage() {
                 <FormItem>
                   <FormLabel>角色</FormLabel>
                   <div className="flex flex-wrap gap-3">
-                    {ALL_ROLES.map((r) => {
+                    {allRoles.map((r) => {
                       const checked = (field.value as string[]).includes(r);
                       return (
                         <label
@@ -573,7 +580,7 @@ export default function UsersPage() {
                 <FormItem>
                   <FormLabel>角色</FormLabel>
                   <div className="flex flex-wrap gap-3">
-                    {ALL_ROLES.map((r) => {
+                    {allRoles.map((r) => {
                       const checked = (field.value as string[]).includes(r);
                       return (
                         <label

@@ -45,12 +45,19 @@ const usersFixture = [
     name: 'Alice',
     lab: { id: 'lab-1', name: 'Lab A' },
     labId: 'lab-1',
-    roles: [{ role: { code: 'PLAIN_USER' } }],
+    roles: ['PLAIN_USER'],
   },
 ];
 const labsFixture = [
   { id: 'lab-1', name: 'Lab A' },
   { id: 'lab-2', name: 'Lab B' },
+];
+const rolesFixture = [
+  { id: 'r1', code: 'PLAIN_USER', name: '普通用户' },
+  { id: 'r2', code: 'LAB_HEAD', name: '实验室负责人' },
+  { id: 'r3', code: 'REAGENT_ADMIN', name: '试剂管理员' },
+  { id: 'r4', code: 'SAFETY_OFFICER', name: '安全员' },
+  { id: 'r5', code: 'SYS_ADMIN', name: '系统管理员' },
 ];
 
 function pageMatches(path: string, prefix: string) {
@@ -74,6 +81,7 @@ describe('/admin/users page', () => {
           pageSize: 10,
         };
       if (path === '/labs') return labsFixture;
+      if (path === '/roles') return rolesFixture;
       if (opts?.method === 'PATCH') return {};
       if (opts?.method === 'DELETE') return {};
       if (opts?.method === 'POST' && path === '/users') return { id: 'u2' };
@@ -145,6 +153,7 @@ describe('/admin/users page', () => {
           pageSize: 10,
         };
       if (path === '/labs') return labsFixture;
+      if (path === '/roles') return rolesFixture;
       if (opts?.method === 'PATCH')
         throw new Error('API 422: validation failed');
       throw new Error('unmocked');
@@ -240,6 +249,7 @@ describe('/admin/users page', () => {
           pageSize: 10,
         };
       if (path === '/labs') return labsFixture;
+      if (path === '/roles') return rolesFixture;
       if (opts?.method === 'POST' && path === '/users')
         throw new Error('API 409: email exists');
       throw new Error('unmocked');
