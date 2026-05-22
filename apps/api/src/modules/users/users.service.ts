@@ -9,34 +9,41 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { PageQueryDto } from './dto/page-query.dto';
 import { RoleCode } from '@prisma/client';
+import { toUserView, toUserViews } from './users.view';
+
+const INCLUDE_FOR_VIEW = {
+  roles: { include: { role: true } },
+  lab: true,
+} as const;
 
 @Injectable()
 export class UsersService {
   constructor(private prisma: PrismaService) {}
 
-  list() {
-    return this.prisma.user.findMany({
+  async list() {
+    const rows = await this.prisma.user.findMany({
       where: { deletedAt: null },
-      include: { roles: { include: { role: true } }, lab: true },
+      include: INCLUDE_FOR_VIEW,
       orderBy: { createdAt: 'desc' },
     });
+    return toUserViews(rows);
   }
 
   async listPaged(q: PageQueryDto) {
     const pageNum = q.pageNum ?? 1;
     const pageSize = q.pageSize ?? 10;
     const where = { deletedAt: null };
-    const [items, total] = await this.prisma.$transaction([
+    const [rows, total] = await this.prisma.$transaction([
       this.prisma.user.findMany({
         where,
-        include: { roles: { include: { role: true } }, lab: true },
+        include: INCLUDE_FOR_VIEW,
         orderBy: { createdAt: 'desc' },
         skip: (pageNum - 1) * pageSize,
         take: pageSize,
       }),
       this.prisma.user.count({ where }),
     ]);
-    return { items, total, pageNum, pageSize };
+    return { items: toUserViews(rows), total, pageNum, pageSize };
   }
 
   async batchDelete(ids: string[]) {
@@ -71,7 +78,7 @@ export class UsersService {
     if (exists) throw new ConflictException('email exists');
     const passwordHash = await bcrypt.hash(dto.password, 10);
     const roleRecords = await this.resolveRoles(dto.roles ?? ['PLAIN_USER']);
-    return this.prisma.user.create({
+    const row = await this.prisma.user.create({
       data: {
         email: dto.email,
         name: dto.name,
@@ -79,7 +86,9 @@ export class UsersService {
         labId: dto.labId,
         roles: { create: roleRecords.map((r) => ({ roleId: r.id })) },
       },
+      include: INCLUDE_FOR_VIEW,
     });
+    return toUserView(row);
   }
 
   async update(id: string, dto: UpdateUserDto) {
@@ -93,14 +102,21 @@ export class UsersService {
       await this.prisma.userRole.deleteMany({ where: { userId: id } });
       data.roles = { create: roleRecords.map((r) => ({ roleId: r.id })) };
     }
-    return this.prisma.user.update({ where: { id }, data });
+    const row = await this.prisma.user.update({
+      where: { id },
+      data,
+      include: INCLUDE_FOR_VIEW,
+    });
+    return toUserView(row);
   }
 
   async softDelete(id: string) {
-    return this.prisma.user.update({
+    const row = await this.prisma.user.update({
       where: { id },
       data: { deletedAt: new Date(), tokenVersion: { increment: 1 } },
+      include: INCLUDE_FOR_VIEW,
     });
+    return toUserView(row);
   }
 
   async resetPassword(id: string): Promise<{ tempPassword: string }> {

@@ -275,4 +275,55 @@ describe('Users', () => {
       .send({ ids: [] });
     expectBizError(r, 400);
   });
+
+  it('GET /users 不返回敏感字段', async () => {
+    const r = await request(app.getHttpServer())
+      .get('/users')
+      .set('Authorization', `Bearer ${adminToken}`);
+    const data = expectOk(r);
+    expect(Array.isArray(data)).toBe(true);
+    for (const u of data) {
+      expect(u).not.toHaveProperty('passwordHash');
+      expect(u).not.toHaveProperty('currentRefreshJti');
+      expect(u).not.toHaveProperty('tokenVersion');
+    }
+  });
+
+  it('GET /users 返回 roles 是字符串数组', async () => {
+    const r = await request(app.getHttpServer())
+      .get('/users')
+      .set('Authorization', `Bearer ${adminToken}`);
+    const data = expectOk(r);
+    expect(data.length).toBeGreaterThan(0);
+    for (const u of data) {
+      expect(Array.isArray(u.roles)).toBe(true);
+      for (const role of u.roles) {
+        expect(typeof role).toBe('string');
+      }
+    }
+  });
+
+  it('POST /users 返回的 view 不含敏感字段', async () => {
+    const r = await request(app.getHttpServer())
+      .post('/users')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        email: 'sanitize@lab.local',
+        name: 'Sanitize',
+        password: 'pass1234',
+        roles: ['PLAIN_USER'],
+      });
+    expect(r.status).toBe(201);
+    expect(r.body.code).toBe(200);
+    expect(r.body.data).not.toHaveProperty('passwordHash');
+    expect(r.body.data).not.toHaveProperty('currentRefreshJti');
+    expect(r.body.data).not.toHaveProperty('tokenVersion');
+    expect(Array.isArray(r.body.data.roles)).toBe(true);
+    expect(r.body.data.roles).toEqual(['PLAIN_USER']);
+
+    await prisma.userRole.deleteMany({
+      where: { user: { email: 'sanitize@lab.local' } },
+    });
+    await prisma.user.delete({ where: { email: 'sanitize@lab.local' } });
+  });
 });
