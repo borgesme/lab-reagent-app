@@ -100,15 +100,21 @@ export default function PurchaseApprovalsPage() {
                     onChange={(e) =>
                       setComment({ ...comment, [bid]: e.target.value })
                     }
+                    data-testid={`purchase-approvals-comment-${bid}`}
                   />
                   <div className="mt-3 flex justify-end gap-2">
-                    <Button size="sm" onClick={() => decide(bid, 'APPROVE')}>
+                    <Button
+                      size="sm"
+                      onClick={() => decide(bid, 'APPROVE')}
+                      data-testid={`purchase-approvals-approve-${bid}`}
+                    >
                       通过
                     </Button>
                     <Button
                       size="sm"
                       variant="destructive"
                       onClick={() => decide(bid, 'REJECT')}
+                      data-testid={`purchase-approvals-reject-${bid}`}
                     >
                       拒绝
                     </Button>
