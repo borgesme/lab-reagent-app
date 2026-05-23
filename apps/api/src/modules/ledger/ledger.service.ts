@@ -67,9 +67,10 @@ export class LedgerService {
     const where: Prisma.IssueRecordWhereInput = {};
     if (labId) where.request = { labId };
     if (query.from || query.to) {
-      where.createdAt = {};
-      if (query.from) (where.createdAt as any).gte = new Date(query.from);
-      if (query.to) (where.createdAt as any).lte = new Date(query.to);
+      const createdAt: Prisma.DateTimeFilter = {};
+      if (query.from) createdAt.gte = new Date(query.from);
+      if (query.to) createdAt.lte = new Date(query.to);
+      where.createdAt = createdAt;
     }
 
     const issues = await this.prisma.issueRecord.findMany({
@@ -166,7 +167,7 @@ export class LedgerService {
         action: 'LEDGER_SNAPSHOT_GENERATE',
         entityType: 'ControlledLedgerSnapshot',
         entityId: snap.id,
-        after: { labId, yearMonth, rowCount: rows.length } as any,
+        after: { labId, yearMonth, rowCount: rows.length } satisfies Prisma.InputJsonValue,
       },
     });
 
