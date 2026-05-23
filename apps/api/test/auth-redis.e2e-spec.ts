@@ -185,7 +185,7 @@ describe('Auth + Redis (blacklist + rate-limit)', () => {
   );
 
   testIfRedis(
-    '6) GET /auth/me 无 @RateLimit, 任意频率 200',
+    '6) GET /auth/me 有 RateLimit(120/60s) 但额度宽松, 20 次循环全 200',
     async () => {
       const tokens = await loginAdmin();
       for (let i = 0; i < 20; i++) {

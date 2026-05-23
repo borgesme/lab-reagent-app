@@ -16,6 +16,7 @@ export class AuthController {
 
   @Public()
   @Post('register')
+  @RateLimit({ scope: 'auth:register:ip', keyBy: 'ip', limit: 5, windowSec: 60 })
   @ApiOperation({ summary: '注册新用户' })
   register(@Body() dto: RegisterDto) {
     return this.auth.register(dto);
@@ -34,6 +35,7 @@ export class AuthController {
   @Public()
   @Post('refresh')
   @HttpCode(200)
+  @RateLimit({ scope: 'auth:refresh:ip', keyBy: 'ip', limit: 30, windowSec: 60 })
   @ApiOperation({ summary: '用 refresh token 换新的 access/refresh token' })
   refresh(@Body('refreshToken') token: string) {
     return this.auth.refresh(token);
@@ -50,6 +52,7 @@ export class AuthController {
 
   @Get('me')
   @ApiBearerAuth()
+  @RateLimit({ scope: 'auth:me:ip', keyBy: 'ip', limit: 120, windowSec: 60 })
   @ApiOperation({ summary: '当前登录用户资料' })
   me(@Req() req: any) {
     return this.auth.me(req.user.sub);
@@ -66,6 +69,7 @@ export class AuthController {
   @Post('change-password')
   @ApiBearerAuth()
   @HttpCode(200)
+  @RateLimit({ scope: 'auth:change-password:ip', keyBy: 'ip', limit: 5, windowSec: 60 })
   @Audit({ action: 'USER_CHANGE_PASSWORD', entityType: 'User' })
   @ApiOperation({ summary: '修改密码, tokenVersion++ 踢其他会话' })
   changePassword(@Req() req: any, @Body() dto: ChangePasswordDto) {
