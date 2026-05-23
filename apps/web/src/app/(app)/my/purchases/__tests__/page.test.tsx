@@ -19,55 +19,16 @@ vi.mock('@/lib/api-client', () => ({
   apiBaseUrl: '/api/v1',
 }));
 
-// Radix Select 在 jsdom 中无法工作 (portal + pointer events) — 用 native select 替代
-vi.mock('@/components/ui/select', () => {
-  const React = require('react');
-  const SelectCtx = React.createContext<any>(null);
-  function Select({ value, onValueChange, children }: any) {
-    // 收集所有 SelectItem 子节点 → 渲染成 native <select>
-    const items: { value: string; label: any }[] = [];
-    function collect(nodes: any) {
-      React.Children.forEach(nodes, (child: any) => {
-        if (!child || typeof child !== 'object') return;
-        if (child.type && child.type.__isSelectItem) {
-          items.push({ value: child.props.value, label: child.props.children });
-        } else if (child.props && child.props.children) {
-          collect(child.props.children);
-        }
-      });
-    }
-    collect(children);
-    return (
-      <SelectCtx.Provider value={{ value, onValueChange }}>
-        <select
-          data-testid="my-purchases-form-reagent"
-          value={value ?? ''}
-          onChange={(e) => onValueChange?.(e.target.value)}
-        >
-          <option value="" disabled>选择试剂</option>
-          {items.map((it) => (
-            <option key={it.value} value={it.value}>
-              {it.label}
-            </option>
-          ))}
-        </select>
-      </SelectCtx.Provider>
-    );
-  }
-  function SelectTrigger({ children }: any) {
-    return <>{children}</>;
-  }
-  function SelectContent({ children }: any) {
-    return <>{children}</>;
-  }
-  function SelectValue() {
-    return null;
-  }
-  function SelectItem({ children }: any) {
-    return <>{children}</>;
-  }
-  (SelectItem as any).__isSelectItem = true;
-  return { Select, SelectTrigger, SelectContent, SelectValue, SelectItem };
+// Radix Select 在 jsdom 中无法工作 (portal + pointer events) — 用共享 mock 替代。
+// 注意：vi.mock 的 factory 在 hoist 阶段执行，不能引用顶层 import 的符号，
+// 因此用 await import() 在 factory 内部按需加载。
+// 页面源码 SelectTrigger 没设 data-testid，这里显式给出。
+vi.mock('@/components/ui/select', async () => {
+  const { createSelectMock } = await import('@/test-utils/mock-select');
+  return createSelectMock({
+    testId: 'my-purchases-form-reagent',
+    placeholder: '选择试剂',
+  });
 });
 
 function renderWithQuery(ui: React.ReactElement) {
