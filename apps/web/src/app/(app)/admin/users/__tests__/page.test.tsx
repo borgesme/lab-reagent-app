@@ -398,4 +398,83 @@ describe('/admin/users page', () => {
     );
     expect(postCalls.length).toBe(0);
   });
+
+  it('rolesQuery 失败 → toast.error 触发', async () => {
+    const { toast } = await import('sonner');
+    mockApiFetch.mockImplementation(async (path: string, opts?: any) => {
+      if (pageMatches(path, '/users/page') && (!opts || !opts.method))
+        return {
+          items: usersFixture,
+          total: usersFixture.length,
+          pageNum: 1,
+          pageSize: 10,
+        };
+      if (path === '/labs') return labsFixture;
+      if (path === '/roles') throw new Error('API 500: roles down');
+      throw new Error(`unmocked ${opts?.method ?? 'GET'} ${path}`);
+    });
+
+    renderWithQuery(<UsersPage />);
+
+    await waitFor(
+      () => {
+        expect(
+          (toast.error as any).mock.calls.some((c: any[]) =>
+            String(c[0]).includes('roles down'),
+          ),
+        ).toBe(true);
+      },
+      { timeout: 4000 },
+    );
+  });
+
+  it('labsQuery 失败 → toast.error 触发', async () => {
+    const { toast } = await import('sonner');
+    mockApiFetch.mockImplementation(async (path: string, opts?: any) => {
+      if (pageMatches(path, '/users/page') && (!opts || !opts.method))
+        return {
+          items: usersFixture,
+          total: usersFixture.length,
+          pageNum: 1,
+          pageSize: 10,
+        };
+      if (path === '/labs') throw new Error('API 500: labs down');
+      if (path === '/roles') return rolesFixture;
+      throw new Error(`unmocked ${opts?.method ?? 'GET'} ${path}`);
+    });
+
+    renderWithQuery(<UsersPage />);
+
+    await waitFor(
+      () => {
+        expect(
+          (toast.error as any).mock.calls.some((c: any[]) =>
+            String(c[0]).includes('labs down'),
+          ),
+        ).toBe(true);
+      },
+      { timeout: 4000 },
+    );
+  });
+
+  it('rolesQuery loading 时"添加用户"按钮 disabled', async () => {
+    mockApiFetch.mockImplementation(async (path: string, opts?: any) => {
+      if (pageMatches(path, '/users/page') && (!opts || !opts.method))
+        return {
+          items: usersFixture,
+          total: usersFixture.length,
+          pageNum: 1,
+          pageSize: 10,
+        };
+      if (path === '/labs') return labsFixture;
+      if (path === '/roles') return new Promise(() => {}); // never resolves
+      throw new Error(`unmocked ${opts?.method ?? 'GET'} ${path}`);
+    });
+
+    renderWithQuery(<UsersPage />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('admin-users-create-btn')).toBeDisabled();
+    });
+  });
 });

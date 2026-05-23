@@ -155,6 +155,20 @@ export default function UsersPage() {
     [rolesQuery.data],
   );
 
+  useEffect(() => {
+    if (rolesQuery.error) {
+      toast.error((rolesQuery.error as Error).message ?? '加载角色失败');
+    }
+  }, [rolesQuery.error]);
+
+  useEffect(() => {
+    if (labsQuery.error) {
+      toast.error((labsQuery.error as Error).message ?? '加载实验室失败');
+    }
+  }, [labsQuery.error]);
+
+  const metaLoading = rolesQuery.isLoading || labsQuery.isLoading;
+
   const labOptions = useMemo(
     () => [
       { value: '', label: '无实验室' },
@@ -216,7 +230,13 @@ export default function UsersPage() {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem
-              onClick={() => setEditing(row.original)}
+              onClick={() => {
+                if (metaLoading) {
+                  toast.error('角色 / 实验室加载中，请稍候');
+                  return;
+                }
+                setEditing(row.original);
+              }}
               data-testid={`admin-users-row-${row.original.id}-edit`}
             >
               编辑
@@ -266,6 +286,7 @@ export default function UsersPage() {
             )}
             <Button
               onClick={() => setCreating(true)}
+              disabled={metaLoading}
               data-testid="admin-users-create-btn"
             >
               <Plus className="mr-2 h-4 w-4" /> 添加用户
