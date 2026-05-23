@@ -744,4 +744,42 @@ describe('Requests', () => {
       });
     });
   });
+
+  describe('mine & scope query params', () => {
+    it('GET /requests?mine=1 PLAIN_USER 只拿到自己的', async () => {
+      const r = await request(app.getHttpServer())
+        .get('/requests?mine=1')
+        .set('Authorization', `Bearer ${plainToken}`);
+      const data = expectOk(r);
+      expect(data.every((x: any) => x.applicantId === plainUserId)).toBe(true);
+    });
+
+    it('GET /requests?mine=1 SYS_ADMIN 也强制只拿自己', async () => {
+      const adminUser = await prisma.user.findUnique({
+        where: { email: 'admin@lab.local' },
+      });
+      const r = await request(app.getHttpServer())
+        .get('/requests?mine=1')
+        .set('Authorization', `Bearer ${adminToken}`);
+      const data = expectOk(r);
+      expect(
+        data.every((x: any) => x.applicantId === adminUser!.id),
+      ).toBe(true);
+    });
+
+    it('GET /requests?scope=approval PLAIN_USER → 403', async () => {
+      const r = await request(app.getHttpServer())
+        .get('/requests?scope=approval')
+        .set('Authorization', `Bearer ${plainToken}`);
+      expectBizError(r, 403);
+    });
+
+    it('GET /requests?scope=approval SYS_ADMIN 仅返 PENDING', async () => {
+      const r = await request(app.getHttpServer())
+        .get('/requests?scope=approval')
+        .set('Authorization', `Bearer ${adminToken}`);
+      const data = expectOk(r);
+      expect(data.every((x: any) => x.status === 'PENDING')).toBe(true);
+    });
+  });
 });

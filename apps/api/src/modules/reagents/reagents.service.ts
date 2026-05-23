@@ -9,16 +9,26 @@ export class ReagentsService {
   constructor(private prisma: PrismaService) {}
 
   list(query: QueryReagentDto) {
-    const where: any = { deletedAt: null };
+    const and: any[] = [{ deletedAt: null }];
     if (query.q) {
-      where.OR = [
-        { name: { contains: query.q, mode: 'insensitive' } },
-        { cas: { contains: query.q, mode: 'insensitive' } },
-      ];
+      and.push({
+        OR: [
+          { name: { contains: query.q, mode: 'insensitive' } },
+          { cas: { contains: query.q, mode: 'insensitive' } },
+        ],
+      });
     }
-    if (query.category) where.category = query.category;
+    if (query.category) and.push({ category: query.category });
+    if (query.controlled === '1') {
+      and.push({
+        OR: [
+          { hazardLevel: 'CONTROLLED' },
+          { controlType: { not: null } },
+        ],
+      });
+    }
     return this.prisma.reagent.findMany({
-      where,
+      where: { AND: and },
       orderBy: { name: 'asc' },
     });
   }

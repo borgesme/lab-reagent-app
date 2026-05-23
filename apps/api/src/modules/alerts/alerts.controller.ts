@@ -7,9 +7,11 @@ import {
   Patch,
   Post,
   Query,
+  Req,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { ConfigService } from './config.service';
+import { AlertsService } from './alerts.service';
 import { UpsertConfigDto } from './dto/upsert-config.dto';
 import { QueryConfigDto } from './dto/query-config.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -54,5 +56,18 @@ export class AlertsController {
   @ApiOperation({ summary: '删除配置' })
   remove(@Param('id') id: string, @CurrentUser() user: any) {
     return this.config.remove(id, user);
+  }
+}
+
+@ApiTags('alerts')
+@ApiBearerAuth()
+@Controller('alerts')
+export class AlertsActiveController {
+  constructor(private readonly alerts: AlertsService) {}
+
+  @Get('active')
+  @ApiOperation({ summary: '当前用户未读的告警通知 (最新 50 条)' })
+  active(@Req() req: any) {
+    return this.alerts.listActiveForUser(req.user.sub);
   }
 }

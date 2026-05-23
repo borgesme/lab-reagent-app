@@ -265,4 +265,49 @@ describe('Alerts', () => {
       expect(rec).not.toBeNull();
     });
   });
+
+  describe('GET /alerts/active', () => {
+    it('返回当前用户未读告警 + 标记为已读后消失', async () => {
+      const lh = await prisma.user.findUnique({
+        where: { email: 'lh-alerts@lab.local' },
+      });
+      await prisma.notification.deleteMany({
+        where: { recipientId: lh!.id },
+      });
+      await prisma.notification.create({
+        data: {
+          recipientId: lh!.id,
+          labId: 'lab-default',
+          type: 'ALERT_LOW_STOCK',
+          title: '库存告急',
+          body: 'just a test',
+          payload: {},
+        },
+      });
+
+      const r1 = await request(app.getHttpServer())
+        .get('/alerts/active')
+        .set('Authorization', `Bearer ${labHeadToken}`);
+      const data1 = expectOk(r1);
+      expect(Array.isArray(data1)).toBe(true);
+      expect(data1.length).toBe(1);
+      expect(data1[0].type).toBe('ALERT_LOW_STOCK');
+
+      await prisma.notification.updateMany({
+        where: { recipientId: lh!.id },
+        data: { readAt: new Date() },
+      });
+
+      const r2 = await request(app.getHttpServer())
+        .get('/alerts/active')
+        .set('Authorization', `Bearer ${labHeadToken}`);
+      const data2 = expectOk(r2);
+      expect(data2.length).toBe(0);
+    });
+
+    it('未登录 → 401', async () => {
+      const r = await request(app.getHttpServer()).get('/alerts/active');
+      expectBizError(r, 401);
+    });
+  });
 });

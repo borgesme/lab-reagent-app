@@ -24,13 +24,36 @@ export class RequestsService {
     if (query.status) where.status = query.status;
     if (query.reagentId) where.reagentId = query.reagentId;
 
-    if (actor.roles.includes('SYS_ADMIN')) {
+    if (query.scope === 'approval') {
+      where.status = RequestStatus.PENDING;
+      if (actor.roles.includes('SYS_ADMIN')) {
+        if (query.labId) where.labId = query.labId;
+      } else if (
+        actor.roles.includes('LAB_HEAD') ||
+        actor.roles.includes('REAGENT_ADMIN')
+      ) {
+        const user = await this.prisma.user.findUnique({
+          where: { id: actor.sub },
+        });
+        if (!user?.labId) throw new ForbiddenException('user has no lab');
+        where.labId = user.labId;
+      } else {
+        throw new ForbiddenException('scope=approval requires reviewer role');
+      }
+    } else if (query.mine === '1') {
+      where.applicantId = actor.sub;
+      if (actor.roles.includes('SYS_ADMIN') && query.labId) {
+        where.labId = query.labId;
+      }
+    } else if (actor.roles.includes('SYS_ADMIN')) {
       if (query.labId) where.labId = query.labId;
     } else if (
       actor.roles.includes('LAB_HEAD') ||
       actor.roles.includes('REAGENT_ADMIN')
     ) {
-      const user = await this.prisma.user.findUnique({ where: { id: actor.sub } });
+      const user = await this.prisma.user.findUnique({
+        where: { id: actor.sub },
+      });
       if (!user?.labId) throw new ForbiddenException('user has no lab');
       where.labId = user.labId;
     } else {

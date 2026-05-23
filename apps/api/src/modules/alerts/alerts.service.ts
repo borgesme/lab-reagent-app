@@ -193,4 +193,26 @@ export class AlertsService {
     }
     return out;
   }
+
+  async listActiveForUser(userId: string) {
+    return this.prisma.notification.findMany({
+      where: {
+        recipientId: userId,
+        readAt: null,
+        type: {
+          in: ['ALERT_LOW_STOCK', 'ALERT_EXPIRING', 'ALERT_RECONCILE'],
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+      select: {
+        id: true,
+        type: true,
+        title: true,
+        body: true,
+        payload: true,
+        createdAt: true,
+      },
+    });
+  }
 }

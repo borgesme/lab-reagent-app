@@ -85,4 +85,28 @@ describe('Reagents', () => {
     const data = expectOk(r);
     expect(data.some((x: any) => x.name.includes('Acetone'))).toBe(true);
   });
+
+  it('controlled=1 仅返回受控试剂', async () => {
+    await prisma.reagent.upsert({
+      where: { id: 'reagent-ctrl-list' },
+      update: {},
+      create: {
+        id: 'reagent-ctrl-list',
+        name: 'TestReagent-ControlledList',
+        hazardLevel: 'CONTROLLED',
+        controlType: 'TOXIC',
+        category: '管控',
+      },
+    });
+    const r = await request(app.getHttpServer())
+      .get('/reagents?controlled=1')
+      .set('Authorization', `Bearer ${adminToken}`);
+    const data = expectOk(r);
+    expect(data.length).toBeGreaterThan(0);
+    expect(
+      data.every(
+        (x: any) => x.hazardLevel === 'CONTROLLED' || x.controlType != null,
+      ),
+    ).toBe(true);
+  });
 });
