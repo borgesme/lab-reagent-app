@@ -2,14 +2,14 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import * as Lucide from 'lucide-react';
 import { useAuth } from '@/lib/auth-store';
 import { NAV, filterNavByRoles, type IconName } from '@/lib/nav';
+import { ICONS } from '@/lib/nav-icons';
 import type { RoleCode } from '@app/shared';
 import { cn } from '@/lib/utils';
 
 function Icon({ name, className }: { name: IconName; className?: string }) {
-  const C = (Lucide as any)[name] as React.ComponentType<{ className?: string }>;
+  const C = ICONS[name];
   return C ? <C className={className} /> : null;
 }
 

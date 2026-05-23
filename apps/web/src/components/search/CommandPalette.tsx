@@ -1,7 +1,6 @@
 'use client';
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import * as Lucide from 'lucide-react';
 import {
   CommandDialog,
   CommandEmpty,
@@ -14,6 +13,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/lib/auth-store';
 import { NAV, filterNavByRoles, flatNavItems, type IconName } from '@/lib/nav';
+import { ICONS } from '@/lib/nav-icons';
 import { apiFetch } from '@/lib/api-client';
 import type { RoleCode } from '@app/shared';
 
@@ -31,7 +31,7 @@ export interface CommandPaletteProps {
 }
 
 function Icon({ name, className }: { name: IconName; className?: string }) {
-  const C = (Lucide as any)[name] as React.ComponentType<{ className?: string }>;
+  const C = ICONS[name];
   return C ? <C className={className} /> : null;
 }
 
