@@ -154,6 +154,11 @@ export default function UsersPage() {
     () => (rolesQuery.data ?? []).map((r) => r.code),
     [rolesQuery.data],
   );
+  const roleNameByCode = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const r of rolesQuery.data ?? []) m.set(r.code, r.name);
+    return m;
+  }, [rolesQuery.data]);
 
   useEffect(() => {
     if (rolesQuery.error) {
@@ -206,7 +211,7 @@ export default function UsersPage() {
         <div className="flex flex-wrap gap-1">
           {(row.original.roles ?? []).map((code) => (
             <Badge key={code} variant="secondary">
-              {code}
+              {roleNameByCode.get(code) ?? code}
             </Badge>
           ))}
         </div>
@@ -407,7 +412,7 @@ export default function UsersPage() {
                             }}
                             data-testid={`admin-users-edit-role-${r}`}
                           />
-                          {r}
+                          {roleNameByCode.get(r) ?? r}
                         </label>
                       );
                     })}
@@ -651,7 +656,7 @@ export default function UsersPage() {
                             }}
                             data-testid={`admin-users-create-role-${r}`}
                           />
-                          {r}
+                          {roleNameByCode.get(r) ?? r}
                         </label>
                       );
                     })}

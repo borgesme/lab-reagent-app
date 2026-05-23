@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -26,6 +26,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/lib/auth-store';
+import { useApiQuery } from '@/lib/use-api-query';
 import { updateMyProfile } from '@/lib/api/me';
 import { ChangePasswordDialog } from './ChangePasswordDialog';
 
@@ -33,6 +34,12 @@ const schema = z.object({
   name: z.string().min(1, '姓名不能为空').max(50, '不超过 50 字'),
 });
 type Values = z.infer<typeof schema>;
+
+interface RoleSummary {
+  id: string;
+  code: string;
+  name: string;
+}
 
 function Field({
   label,
@@ -60,6 +67,15 @@ export function ProfileSheet({
   const setUser = useAuth((s) => s.setUser);
   const token = useAuth((s) => s.tokens?.accessToken);
   const [pwdOpen, setPwdOpen] = useState(false);
+
+  const rolesQuery = useApiQuery<RoleSummary[]>('/roles', {
+    queryKey: ['roles'],
+  });
+  const roleNameByCode = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const r of rolesQuery.data ?? []) m.set(r.code, r.name);
+    return m;
+  }, [rolesQuery.data]);
 
   const form = useForm<Values>({
     resolver: zodResolver(schema),
@@ -120,7 +136,7 @@ export function ProfileSheet({
             <div className="flex flex-wrap gap-1">
               {user.roles.map((r) => (
                 <Badge key={r} variant="secondary">
-                  {r}
+                  {roleNameByCode.get(r) ?? r}
                 </Badge>
               ))}
             </div>
