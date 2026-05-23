@@ -308,7 +308,8 @@ export default function UsersPage() {
               token,
               body: {
                 name: values.name,
-                labId: values.labId || undefined,
+                // 空字符串 → null（调离实验室）；非空字符串 → 设置；undefined 不会出现因为 form 默认 ''
+                labId: values.labId === '' ? null : values.labId,
                 roles: values.roles,
               },
             });

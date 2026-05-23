@@ -96,7 +96,8 @@ export class UsersService {
     if (!user || user.deletedAt) throw new NotFoundException();
     const data: any = {};
     if (dto.name) data.name = dto.name;
-    if (dto.labId) data.labId = dto.labId;
+    // null 表示清空 labId（调离实验室）；字符串表示设置；缺省（属性不存在）表示不动
+    if ('labId' in dto) data.labId = dto.labId;
     if (dto.roles) {
       const roleRecords = await this.resolveRoles(dto.roles);
       await this.prisma.userRole.deleteMany({ where: { userId: id } });

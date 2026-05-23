@@ -116,6 +116,40 @@ describe('Users', () => {
     expect(fresh!.roles.map((ur) => ur.role.code)).toEqual(['LAB_HEAD']);
   });
 
+  it('admin patches user labId 到具体值', async () => {
+    const lab = await prisma.lab.findFirst();
+    expect(lab).toBeTruthy();
+    const bob = await prisma.user.findUnique({
+      where: { email: 'bob@lab.local' },
+    });
+    expect(bob).toBeTruthy();
+    const r = await request(app.getHttpServer())
+      .patch(`/users/${bob!.id}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ labId: lab!.id });
+    const data = expectOk(r);
+    expect(data.lab?.id).toBe(lab!.id);
+
+    const fresh = await prisma.user.findUnique({ where: { id: bob!.id } });
+    expect(fresh!.labId).toBe(lab!.id);
+  });
+
+  it('admin patches user labId = null 调离实验室', async () => {
+    const bob = await prisma.user.findUnique({
+      where: { email: 'bob@lab.local' },
+    });
+    expect(bob).toBeTruthy();
+    const r = await request(app.getHttpServer())
+      .patch(`/users/${bob!.id}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ labId: null });
+    const data = expectOk(r);
+    expect(data.lab).toBeNull();
+
+    const fresh = await prisma.user.findUnique({ where: { id: bob!.id } });
+    expect(fresh!.labId).toBeNull();
+  });
+
   it('admin patches non-existent user → 404', async () => {
     const r = await request(app.getHttpServer())
       .patch('/users/non-existent-id')

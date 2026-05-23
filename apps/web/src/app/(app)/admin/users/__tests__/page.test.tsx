@@ -118,6 +118,31 @@ describe('/admin/users page', () => {
     });
   });
 
+  it('编辑用户时清空实验室 → PATCH body 含 labId: null', async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    renderWithQuery(<UsersPage />);
+
+    await waitFor(() => screen.getByText('Alice'));
+
+    await user.click(screen.getByTestId('admin-users-row-u1-actions'));
+    await user.click(screen.getByTestId('admin-users-row-u1-edit'));
+
+    const labInput = await screen.findByTestId('admin-users-edit-lab');
+    // 初始 value 应是 'lab-1'，清空模拟切到"无实验室"
+    await user.clear(labInput);
+
+    await user.click(screen.getByRole('button', { name: /保存|提交|确认/ }));
+
+    await waitFor(() => {
+      const patchCall = mockApiFetch.mock.calls.find(
+        (c) => c[1]?.method === 'PATCH',
+      );
+      expect(patchCall).toBeDefined();
+      expect(patchCall![0]).toBe('/users/u1');
+      expect(patchCall![1].body.labId).toBeNull();
+    });
+  });
+
   it('重置密码 → POST 调用 + toast 含临时密码', async () => {
     const { toast } = await import('sonner');
     const user = userEvent.setup({ pointerEventsCheck: 0 });
