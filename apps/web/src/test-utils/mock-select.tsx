@@ -90,5 +90,26 @@ export function createSelectMock(opts: SelectMockOptions = {}) {
   }
   (SelectItem as any).__isSelectItem = true;
 
-  return { Select, SelectTrigger, SelectContent, SelectValue, SelectItem };
+  // 防御性 pass-through —— 真实 shadcn select 还会导出 Group/Label/Separator，
+  // 如果某天页面源码用上了分组 Select，mock 必须能透传 children 才不会崩。
+  function SelectGroup({ children }: any) {
+    return <>{children}</>;
+  }
+  function SelectLabel({ children }: any) {
+    return <>{children}</>;
+  }
+  function SelectSeparator() {
+    return null;
+  }
+
+  return {
+    Select,
+    SelectTrigger,
+    SelectContent,
+    SelectValue,
+    SelectItem,
+    SelectGroup,
+    SelectLabel,
+    SelectSeparator,
+  };
 }

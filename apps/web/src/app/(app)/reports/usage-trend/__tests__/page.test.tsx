@@ -1,9 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import UsageTrendPage from '../page';
 import { useAuth } from '@/lib/auth-store';
+import { installBlobDownloadStub } from '@/test-utils/mock-blob-download';
 
 vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
@@ -55,6 +56,7 @@ function usageTrendCalls() {
 }
 
 describe('/reports/usage-trend page', () => {
+  let restoreBlob: () => void;
   beforeEach(() => {
     vi.clearAllMocks();
     useAuth.setState({
@@ -62,6 +64,10 @@ describe('/reports/usage-trend page', () => {
       user: { id: 'admin', email: 'admin@lab.local' } as any,
       hydrated: true,
     });
+    restoreBlob = installBlobDownloadStub();
+  });
+  afterEach(() => {
+    restoreBlob();
   });
 
   it('加载: 默认 query 含 range=30d & groupBy=day；3 个 KpiCard 渲染', async () => {
@@ -190,16 +196,6 @@ describe('/reports/usage-trend page', () => {
       });
       return new Response(blob, { status: 200 }) as Response;
     });
-    if (typeof URL.createObjectURL !== 'function') {
-      (URL as any).createObjectURL = vi.fn(() => 'blob:x');
-    } else {
-      vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:x');
-    }
-    if (typeof URL.revokeObjectURL !== 'function') {
-      (URL as any).revokeObjectURL = vi.fn();
-    } else {
-      vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
-    }
 
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     renderWithQuery(<UsageTrendPage />);
