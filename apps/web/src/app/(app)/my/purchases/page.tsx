@@ -124,7 +124,13 @@ export default function MyPurchasesPage() {
           row.original.status === 'PENDING' ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="操作">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  aria-label="操作"
+                  data-testid={`my-purchases-row-${row.original.id}-actions`}
+                >
                   <MoreHorizontal className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
@@ -132,6 +138,7 @@ export default function MyPurchasesPage() {
                 <DropdownMenuItem
                   className="text-destructive"
                   onClick={() => setCancelling(row.original)}
+                  data-testid={`my-purchases-row-${row.original.id}-cancel`}
                 >
                   取消
                 </DropdownMenuItem>
@@ -148,7 +155,10 @@ export default function MyPurchasesPage() {
       <PageHeader
         title="我的采购申请"
         actions={
-          <Button onClick={() => setFormOpen(true)}>
+          <Button
+            onClick={() => setFormOpen(true)}
+            data-testid="my-purchases-create-btn"
+          >
             <Plus className="mr-2 h-4 w-4" /> 新采购申请
           </Button>
         }
@@ -169,6 +179,7 @@ export default function MyPurchasesPage() {
         schema={schema}
         defaultValues={defaultValues}
         title="新采购申请"
+        testId="my-purchases-form"
         onSubmit={async (values) => {
           try {
             await apiFetch('/purchases', { method: 'POST', token, body: values });
@@ -209,7 +220,9 @@ export default function MyPurchasesPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>数量</FormLabel>
-                    <FormControl><Input {...field} /></FormControl>
+                    <FormControl>
+                      <Input {...field} data-testid="my-purchases-form-quantity" />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -220,7 +233,9 @@ export default function MyPurchasesPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>单位</FormLabel>
-                    <FormControl><Input {...field} /></FormControl>
+                    <FormControl>
+                      <Input {...field} data-testid="my-purchases-form-unit" />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -232,7 +247,9 @@ export default function MyPurchasesPage() {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>采购理由</FormLabel>
-                  <FormControl><Textarea rows={3} {...field} /></FormControl>
+                  <FormControl>
+                    <Textarea rows={3} {...field} data-testid="my-purchases-form-reason" />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
@@ -247,6 +264,7 @@ export default function MyPurchasesPage() {
         title="取消采购申请"
         description={`确认取消该采购申请？`}
         confirmLabel="确认取消"
+        testId="my-purchases-cancel"
         onConfirm={async () => {
           if (!cancelling) return;
           try {
