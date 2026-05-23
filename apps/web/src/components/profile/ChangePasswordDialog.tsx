@@ -22,8 +22,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { apiFetch } from '@/lib/api-client';
-import { ApiError } from '@/lib/api-error';
+import { apiFetch, ApiError } from '@/lib/api-client';
 import { useAuth } from '@/lib/auth-store';
 import type { AuthTokens } from '@app/shared';
 
@@ -78,8 +77,7 @@ export function ChangePasswordDialog({
         form.setError('currentPassword', { message: '当前密码不正确' });
         return;
       }
-      const msg = e instanceof ApiError ? e.msg : '修改失败';
-      toast.error(msg ?? '修改失败');
+      toast.error(e instanceof ApiError ? e.msg : '修改失败');
     }
   }
 

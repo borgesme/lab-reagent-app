@@ -2,6 +2,8 @@ import type { ApiResponse, AuthTokens } from '@app/shared';
 import { useAuth } from './auth-store';
 import { ApiError } from './api-error';
 
+export { ApiError } from './api-error';
+
 export const apiBaseUrl =
   process.env.NEXT_PUBLIC_API_BASE ?? 'http://localhost:3001/api/v1';
 
