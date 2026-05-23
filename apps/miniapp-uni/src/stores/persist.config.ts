@@ -17,11 +17,4 @@ export const uniStorage: StorageLike = {
       /* 小程序 storage 配额满会失败，忽略 */
     }
   },
-  removeItem(key: string): void {
-    try {
-      uni.removeStorageSync(key);
-    } catch {
-      /* 忽略 */
-    }
-  },
 };
