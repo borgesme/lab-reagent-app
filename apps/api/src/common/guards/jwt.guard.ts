@@ -5,7 +5,6 @@ import {
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { Reflector } from '@nestjs/core';
-import { ConfigService } from '@nestjs/config';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { RedisService } from '../redis/redis.service';
 import { REDIS_KEYS } from '../redis/redis.constants';
@@ -15,7 +14,6 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
   constructor(
     private reflector: Reflector,
     private redis: RedisService,
-    private cfg: ConfigService,
   ) {
     super();
   }
@@ -32,11 +30,7 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
 
     const req = ctx.switchToHttp().getRequest();
     const jti: string | undefined = req.user?.jti;
-    if (!jti) {
-      const allowLegacy = this.cfg.get('JWT_ALLOW_LEGACY_CLAIMS') === '1';
-      if (!allowLegacy) throw new UnauthorizedException();
-      return true;
-    }
+    if (!jti) throw new UnauthorizedException();
     const hit = await this.redis.get(REDIS_KEYS.blacklist(jti));
     if (hit === '1') {
       throw new UnauthorizedException('token revoked');
