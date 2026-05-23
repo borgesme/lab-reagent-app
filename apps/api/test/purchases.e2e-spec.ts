@@ -4,6 +4,7 @@ import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { expectOk, expectBizError } from './helpers/expect-ok';
+import { resetAdminState } from './helpers/reset-admin';
 
 describe('Purchases', () => {
   let app: INestApplication;
@@ -24,6 +25,7 @@ describe('Purchases', () => {
     await app.init();
     prisma = app.get(PrismaService);
 
+    await resetAdminState(prisma);
     await prisma.purchaseReceipt.deleteMany({});
     await prisma.purchaseApproval.deleteMany({});
     await prisma.purchaseRequest.deleteMany({});

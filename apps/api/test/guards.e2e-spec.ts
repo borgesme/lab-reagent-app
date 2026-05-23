@@ -7,9 +7,11 @@ import {
 } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
+import { PrismaService } from '../src/prisma/prisma.service';
 import { Roles } from '../src/common/decorators/roles.decorator';
 import { CurrentUser } from '../src/common/decorators/current-user.decorator';
 import { expectOk, expectBizError } from './helpers/expect-ok';
+import { resetAdminState } from './helpers/reset-admin';
 
 @Controller('test-admin')
 class TestAdminController {
@@ -32,6 +34,9 @@ describe('Guards', () => {
     app = mod.createNestApplication();
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
     await app.init();
+
+    const prisma = app.get(PrismaService);
+    await resetAdminState(prisma);
 
     const res = await request(app.getHttpServer())
       .post('/auth/login')

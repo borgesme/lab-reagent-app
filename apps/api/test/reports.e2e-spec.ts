@@ -2,7 +2,9 @@ import { Test } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
+import { PrismaService } from '../src/prisma/prisma.service';
 import { expectOk, expectBizError } from './helpers/expect-ok';
+import { resetAdminState } from './helpers/reset-admin';
 
 describe('Reports (M1 stubs)', () => {
   let app: INestApplication;
@@ -14,6 +16,9 @@ describe('Reports (M1 stubs)', () => {
     app = mod.createNestApplication();
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
     await app.init();
+
+    const prisma = app.get(PrismaService);
+    await resetAdminState(prisma);
 
     const admin = await request(app.getHttpServer())
       .post('/auth/login')

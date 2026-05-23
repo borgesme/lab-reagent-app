@@ -4,6 +4,7 @@ import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { expectOk, expectBizError } from './helpers/expect-ok';
+import { resetAdminState } from './helpers/reset-admin';
 
 describe('Dashboard KPI', () => {
   let app: INestApplication;
@@ -18,6 +19,7 @@ describe('Dashboard KPI', () => {
     await app.init();
     prisma = app.get(PrismaService);
 
+    await resetAdminState(prisma);
     // 幂等清理 kpi-plain 残留（上次跑挂可能留下）
     await prisma.userRole.deleteMany({
       where: { user: { email: 'kpi-plain@lab.local' } },

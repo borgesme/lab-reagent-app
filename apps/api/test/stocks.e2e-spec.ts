@@ -4,6 +4,7 @@ import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { expectOk, expectBizError } from './helpers/expect-ok';
+import { resetAdminState } from './helpers/reset-admin';
 
 describe('Stocks', () => {
   let app: INestApplication;
@@ -17,6 +18,7 @@ describe('Stocks', () => {
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
     await app.init();
     prisma = app.get(PrismaService);
+    await resetAdminState(prisma);
     await prisma.reagentStock.deleteMany({
       where: { batchNo: { startsWith: 'TestBatch' } },
     });

@@ -4,6 +4,7 @@ import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { expectOk, expectBizError } from './helpers/expect-ok';
+import { resetAdminState } from './helpers/reset-admin';
 
 describe('Users', () => {
   let app: INestApplication;
@@ -16,6 +17,7 @@ describe('Users', () => {
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
     await app.init();
     prisma = app.get(PrismaService);
+    await resetAdminState(prisma);
     await prisma.userRole.deleteMany({
       where: { user: { email: { in: ['bob@lab.local', 'carol@lab.local'] } } },
     });

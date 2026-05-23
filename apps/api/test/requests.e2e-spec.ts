@@ -5,6 +5,7 @@ import * as bcrypt from 'bcryptjs';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { expectOk, expectBizError } from './helpers/expect-ok';
+import { resetAdminState } from './helpers/reset-admin';
 
 describe('Requests', () => {
   let app: INestApplication;
@@ -55,6 +56,7 @@ describe('Requests', () => {
     await app.init();
     prisma = app.get(PrismaService);
 
+    await resetAdminState(prisma);
     await prisma.issueRecord.deleteMany({});
     await prisma.approval.deleteMany({});
     await prisma.request.deleteMany({});

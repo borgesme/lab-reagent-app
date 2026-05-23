@@ -5,6 +5,7 @@ import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { RedisService } from '../src/common/redis/redis.service';
 import { expectOk, expectBizError } from './helpers/expect-ok';
+import { resetAdminState } from './helpers/reset-admin';
 
 describe('Auth + Redis (blacklist + rate-limit)', () => {
   let app: INestApplication;
@@ -24,6 +25,7 @@ describe('Auth + Redis (blacklist + rate-limit)', () => {
     await app.init();
     prisma = app.get(PrismaService);
     redis = app.get(RedisService);
+    await resetAdminState(prisma);
 
     redisOk = await Promise.race([
       redis.__ping(),
