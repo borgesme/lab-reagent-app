@@ -165,14 +165,14 @@ describe('Auth', () => {
         .send({ email: userEmail, password });
     }
 
-    it('当前密码错 → 401, 密码不变', async () => {
+    it('当前密码错 → 400, 密码不变', async () => {
       const lg = await login(initialPwd);
       expectOk(lg);
       const res = await request(app.getHttpServer())
         .post('/auth/change-password')
         .set('Authorization', `Bearer ${lg.body.data.accessToken}`)
         .send({ currentPassword: 'wrong', newPassword: newPwd });
-      expectBizError(res, 401);
+      expectBizError(res, 400);
       const reLogin = await login(initialPwd);
       expectOk(reLogin);
     });

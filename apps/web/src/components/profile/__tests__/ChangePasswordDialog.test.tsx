@@ -78,10 +78,10 @@ describe('ChangePasswordDialog', () => {
     expect(toast.success).toHaveBeenCalled();
   });
 
-  it('401 → 当前密码错字段错误', async () => {
+  it('400 → 当前密码错字段错误', async () => {
     const user = userEvent.setup();
     const fetchMock = vi.fn().mockResolvedValueOnce(
-      json({ code: 401, msg: 'invalid current password', data: null }),
+      json({ code: 400, msg: 'invalid current password', data: null }),
     );
     vi.stubGlobal('fetch', fetchMock);
     render(<ChangePasswordDialog open onOpenChange={vi.fn()} />);

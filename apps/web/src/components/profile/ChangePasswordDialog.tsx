@@ -22,7 +22,8 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { apiBaseUrl } from '@/lib/api-client';
+import { apiFetch } from '@/lib/api-client';
+import { ApiError } from '@/lib/api-error';
 import { useAuth } from '@/lib/auth-store';
 import type { AuthTokens } from '@app/shared';
 
@@ -59,35 +60,27 @@ export function ChangePasswordDialog({
 
   async function onSubmit(values: Values) {
     if (!token) return;
-    const res = await fetch(`${apiBaseUrl}/auth/change-password`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        currentPassword: values.currentPassword,
-        newPassword: values.newPassword,
-      }),
-    });
-    if (!res.ok) {
-      toast.error(`修改失败 (${res.status})`);
-      return;
+    try {
+      const data = await apiFetch<AuthTokens>('/auth/change-password', {
+        method: 'POST',
+        token,
+        body: {
+          currentPassword: values.currentPassword,
+          newPassword: values.newPassword,
+        },
+      });
+      setTokens(data);
+      toast.success('密码已修改，其他设备需要重新登录');
+      form.reset();
+      onOpenChange(false);
+    } catch (e) {
+      if (e instanceof ApiError && e.code === 400) {
+        form.setError('currentPassword', { message: '当前密码不正确' });
+        return;
+      }
+      const msg = e instanceof ApiError ? e.msg : '修改失败';
+      toast.error(msg ?? '修改失败');
     }
-    const body = await res.json();
-    if (body.code === 401) {
-      form.setError('currentPassword', { message: '当前密码不正确' });
-      return;
-    }
-    if (body.code !== 200) {
-      toast.error(body.msg ?? '修改失败');
-      return;
-    }
-    const data = body.data as AuthTokens;
-    setTokens(data);
-    toast.success('密码已修改，其他设备需要重新登录');
-    form.reset();
-    onOpenChange(false);
   }
 
   return (

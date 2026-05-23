@@ -2,6 +2,7 @@ import {
   Injectable,
   UnauthorizedException,
   ConflictException,
+  BadRequestException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -83,7 +84,7 @@ export class AuthService {
       include: { roles: { include: { role: true } } },
     });
     const ok = await bcrypt.compare(dto.currentPassword, user.passwordHash);
-    if (!ok) throw new UnauthorizedException();
+    if (!ok) throw new BadRequestException('当前密码不正确');
     const passwordHash = await bcrypt.hash(dto.newPassword, 10);
     const updated = await this.prisma.user.update({
       where: { id: userId },
