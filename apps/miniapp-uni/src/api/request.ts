@@ -8,7 +8,7 @@ const t = (key: string) => i18n.global.t(key);
 
 export type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
-// @dcloudio/types 的 method 缺 PATCH，借用 uni.request 第一个参数推出来的实际类型来绕开
+// @dcloudio/types 的 method 联合类型缺 PATCH (但 h5/mp 运行时支持)，借 uni.request 第一参的 method 类型做 cross-union as 通过
 type UniRequestMethod = NonNullable<Parameters<typeof uni.request>[0]['method']>;
 
 export interface ApiRequestOpts {
@@ -55,7 +55,6 @@ function doRequest<T>(
   return new Promise((resolve) => {
     uni.request({
       url: `${env.baseUrl}${path}`,
-      // @dcloudio/types 的 method 联合类型不含 PATCH，但 h5/mp 运行时是支持的
       method: (opts.method ?? 'GET') as UniRequestMethod,
       data: opts.data,
       header: {
