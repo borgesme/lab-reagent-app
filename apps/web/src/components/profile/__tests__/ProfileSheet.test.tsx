@@ -51,11 +51,12 @@ describe('ProfileSheet', () => {
 
   it('改名提交 → 200 → store.user.name 更新, 显示 toast', async () => {
     const user = userEvent.setup();
-    const fetchMock = vi.fn(async (url: any) => {
+    const fetchMock = vi.fn(async (url: any, init?: any) => {
       const u = String(url);
       if (u.includes('/roles')) {
         return json({ code: 200, msg: 'ok', data: [] });
       }
+      void init;
       return json({
         code: 200,
         msg: 'ok',
