@@ -6,6 +6,11 @@ import { PrismaService } from '../src/prisma/prisma.service';
 import { expectOk, expectBizError } from './helpers/expect-ok';
 import { resetAdminState } from './helpers/reset-admin';
 
+const expectSnowflakeId = (id: unknown) => {
+  expect(typeof id).toBe('string');
+  expect(id).toMatch(/^\d+$/);
+};
+
 describe('Reagents', () => {
   let app: INestApplication;
   let prisma: PrismaService;
@@ -61,6 +66,7 @@ describe('Reagents', () => {
       });
     expect(r.status).toBe(201);
     expect(r.body.code).toBe(200);
+    expectSnowflakeId(r.body.data.id);
     expect(r.body.data.name).toBe('TestReagent-Acetone');
   });
 

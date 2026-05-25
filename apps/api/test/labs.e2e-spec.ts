@@ -6,6 +6,11 @@ import { PrismaService } from '../src/prisma/prisma.service';
 import { expectOk, expectBizError } from './helpers/expect-ok';
 import { resetAdminState } from './helpers/reset-admin';
 
+const expectSnowflakeId = (id: unknown) => {
+  expect(typeof id).toBe('string');
+  expect(id).toMatch(/^\d+$/);
+};
+
 describe('Labs & Roles', () => {
   let app: INestApplication;
   let prisma: PrismaService;
@@ -35,6 +40,7 @@ describe('Labs & Roles', () => {
       .send({ name: '有机化学实验室', building: '化工楼3楼' });
     expect(r.status).toBe(201);
     expect(r.body.code).toBe(200);
+    expectSnowflakeId(r.body.data.id);
     expect(r.body.data.name).toBe('有机化学实验室');
   });
 

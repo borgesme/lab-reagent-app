@@ -7,6 +7,11 @@ import { NotificationsService } from '../src/modules/notifications/notifications
 import { MailerService } from '../src/modules/notifications/mailer.service';
 import { expectOk, expectBizError } from './helpers/expect-ok';
 
+const expectSnowflakeId = (id: unknown) => {
+  expect(typeof id).toBe('string');
+  expect(id).toMatch(/^\d+$/);
+};
+
 describe('Notifications', () => {
   let app: INestApplication;
   let prisma: PrismaService;
@@ -52,12 +57,13 @@ describe('Notifications', () => {
   });
 
   it('GET /notifications returns only own items', async () => {
-    await notifications.create({
+    const notification = await notifications.create({
       recipientId: aliceId,
       type: 'ALERT_LOW_STOCK',
       title: 'low',
       body: 'low stock',
     });
+    expectSnowflakeId(notification.id);
     await notifications.create({
       recipientId: bobId,
       type: 'ALERT_LOW_STOCK',
