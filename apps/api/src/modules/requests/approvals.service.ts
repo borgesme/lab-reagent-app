@@ -7,12 +7,16 @@ import {
 import { ApprovalAction, RequestStatus } from '@prisma/client';
 import { isControlled } from '@app/shared';
 import { PrismaService } from '../../prisma/prisma.service';
+import { IdService } from '../../common/id/id.service';
 import { ApproveRequestDto } from './dto/approve-request.dto';
 import { ActorContext } from './requests.service';
 
 @Injectable()
 export class ApprovalsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly ids: IdService,
+  ) {}
 
   async approve(
     requestId: string,
@@ -85,6 +89,7 @@ export class ApprovalsService {
     const [approval, updated] = await this.prisma.$transaction([
       this.prisma.approval.create({
         data: {
+          id: this.ids.nextId(),
           requestId,
           approverId: actor.sub,
           action: dto.action,

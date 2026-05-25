@@ -7,6 +7,7 @@ import {
 import { Prisma, RequestStatus } from '@prisma/client';
 import { isControlled } from '@app/shared';
 import { PrismaService } from '../../prisma/prisma.service';
+import { IdService } from '../../common/id/id.service';
 import { CreateRequestDto } from './dto/create-request.dto';
 import { QueryRequestDto } from './dto/query-request.dto';
 
@@ -17,7 +18,10 @@ export interface ActorContext {
 
 @Injectable()
 export class RequestsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly ids: IdService,
+  ) {}
 
   async list(query: QueryRequestDto, actor: ActorContext) {
     const where: Prisma.RequestWhereInput = {};
@@ -128,6 +132,7 @@ export class RequestsService {
 
     return this.prisma.request.create({
       data: {
+        id: this.ids.nextId(),
         applicantId: actor.sub,
         labId: user.labId,
         reagentId: dto.reagentId,

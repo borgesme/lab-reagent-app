@@ -7,12 +7,16 @@ import {
 import { Prisma, RequestStatus } from '@prisma/client';
 import { isControlled } from '@app/shared';
 import { PrismaService } from '../../prisma/prisma.service';
+import { IdService } from '../../common/id/id.service';
 import { IssueRequestDto } from './dto/issue-request.dto';
 import { ActorContext } from './requests.service';
 
 @Injectable()
 export class IssuesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly ids: IdService,
+  ) {}
 
   async issue(
     requestId: string,
@@ -83,6 +87,7 @@ export class IssuesService {
 
       const issue = await tx.issueRecord.create({
         data: {
+          id: this.ids.nextId(),
           requestId,
           issuerId: actor.sub,
           receiverId,
