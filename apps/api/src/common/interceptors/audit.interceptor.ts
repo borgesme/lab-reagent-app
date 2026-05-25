@@ -19,7 +19,7 @@ export class AuditInterceptor implements NestInterceptor {
     private readonly logger: PinoLogger,
     private readonly ids: IdService,
   ) {
-    this.logger.setContext('AuditInterceptor');
+    this.logger.setContext('Audit');
   }
 
   intercept(ctx: ExecutionContext, next: CallHandler): Observable<any> {
