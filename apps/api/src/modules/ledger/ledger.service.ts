@@ -162,7 +162,13 @@ export class LedgerService {
     const snap = await this.prisma.controlledLedgerSnapshot.upsert({
       where: { labId_yearMonth: { labId, yearMonth } },
       update: { csvContent, rowCount: rows.length },
-      create: { labId, yearMonth, csvContent, rowCount: rows.length },
+      create: {
+        id: this.ids.nextId(),
+        labId,
+        yearMonth,
+        csvContent,
+        rowCount: rows.length,
+      },
     });
 
     await this.prisma.auditLog.create({

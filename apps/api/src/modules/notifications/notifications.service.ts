@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { NotificationType, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { IdService } from '../../common/id/id.service';
 import { QueryNotificationsDto } from './dto/query-notifications.dto';
 
 export interface CreateArgs {
@@ -18,11 +19,15 @@ export interface CreateArgs {
 
 @Injectable()
 export class NotificationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly ids: IdService,
+  ) {}
 
   create(args: CreateArgs) {
     return this.prisma.notification.create({
       data: {
+        id: this.ids.nextId(),
         recipientId: args.recipientId,
         labId: args.labId ?? null,
         type: args.type,

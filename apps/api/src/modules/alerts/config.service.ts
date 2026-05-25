@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { IdService } from '../../common/id/id.service';
 import { UpsertConfigDto } from './dto/upsert-config.dto';
 import { QueryConfigDto } from './dto/query-config.dto';
 
@@ -16,13 +17,17 @@ export interface ActorContext {
 
 @Injectable()
 export class ConfigService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly ids: IdService,
+  ) {}
 
   async create(dto: UpsertConfigDto, actor: ActorContext) {
     await this.ensureLabAccess(dto.labId, actor);
     try {
       return await this.prisma.labReagentConfig.create({
         data: {
+          id: this.ids.nextId(),
           labId: dto.labId,
           reagentId: dto.reagentId,
           safetyStock: dto.safetyStock,
