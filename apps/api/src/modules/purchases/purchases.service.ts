@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { IdService } from '../../common/id/id.service';
 import { CreatePurchaseDto } from './dto/create-purchase.dto';
 
 export interface ActorContext {
@@ -16,7 +17,10 @@ export interface ActorContext {
 
 @Injectable()
 export class PurchasesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly ids: IdService,
+  ) {}
 
   async create(dto: CreatePurchaseDto, actor: ActorContext) {
     const user = await this.prisma.user.findUnique({ where: { id: actor.sub } });
@@ -27,6 +31,7 @@ export class PurchasesService {
       throw new BadRequestException('quantity must be positive');
     return this.prisma.purchaseRequest.create({
       data: {
+        id: this.ids.nextId(),
         applicantId: actor.sub,
         labId: user.labId,
         reagentId: dto.reagentId,

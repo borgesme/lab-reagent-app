@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { IdService } from '../../common/id/id.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { MailerService } from '../notifications/mailer.service';
 import { MergeBatchDto } from './dto/merge-batch.dto';
@@ -19,6 +20,7 @@ export class BatchesService {
     private prisma: PrismaService,
     private notifications: NotificationsService,
     private mailer: MailerService,
+    private readonly ids: IdService,
   ) {}
 
   async merge(dto: MergeBatchDto, actor: ActorContext) {
@@ -46,6 +48,7 @@ export class BatchesService {
     return this.prisma.$transaction(async (tx) => {
       const batch = await tx.purchaseBatch.create({
         data: {
+          id: this.ids.nextId(),
           labId: items[0].labId,
           reagentId: items[0].reagentId,
           totalQty: total.toString(),
@@ -80,6 +83,7 @@ export class BatchesService {
     const updated = await this.prisma.$transaction(async (tx) => {
       await tx.purchaseApproval.create({
         data: {
+          id: this.ids.nextId(),
           batchId,
           approverId: actor.sub,
           action: dto.action,
@@ -166,8 +170,11 @@ export class BatchesService {
       throw new ForbiddenException('forbidden');
 
     const receipt = await this.prisma.$transaction(async (tx) => {
+      const stockId = this.ids.nextId();
+      const receiptId = this.ids.nextId();
       const stock = await tx.reagentStock.create({
         data: {
+          id: stockId,
           reagentId: batch.reagentId,
           labId: batch.labId,
           batchNo: dto.batchNo,
@@ -183,8 +190,9 @@ export class BatchesService {
       });
       const r = await tx.purchaseReceipt.create({
         data: {
+          id: receiptId,
           batchId,
-          stockId: stock.id,
+          stockId,
           receivedBy: actor.sub,
           supplier: dto.supplier,
           purchasePrice: dto.purchasePrice,
