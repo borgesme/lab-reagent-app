@@ -2,6 +2,7 @@ import { ForbiddenException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { isControlled } from '@app/shared';
 import { PrismaService } from '../../prisma/prisma.service';
+import { IdService } from '../../common/id/id.service';
 import { QueryLedgerDto } from './dto/query-ledger.dto';
 
 export interface LedgerActor {
@@ -43,7 +44,10 @@ const CSV_HEADERS: (keyof LedgerRow)[] = [
 
 @Injectable()
 export class LedgerService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly ids: IdService,
+  ) {}
 
   async resolveLabScope(
     query: Pick<QueryLedgerDto, 'labId'>,
@@ -163,6 +167,7 @@ export class LedgerService {
 
     await this.prisma.auditLog.create({
       data: {
+        id: this.ids.nextId(),
         actorId: null,
         action: 'LEDGER_SNAPSHOT_GENERATE',
         entityType: 'ControlledLedgerSnapshot',

@@ -9,6 +9,7 @@ import { PinoLogger } from 'nestjs-pino';
 import { Observable, tap } from 'rxjs';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AUDIT_KEY, AuditMeta } from '../decorators/audit.decorator';
+import { IdService } from '../id/id.service';
 
 @Injectable()
 export class AuditInterceptor implements NestInterceptor {
@@ -16,8 +17,9 @@ export class AuditInterceptor implements NestInterceptor {
     private reflector: Reflector,
     private prisma: PrismaService,
     private readonly logger: PinoLogger,
+    private readonly ids: IdService,
   ) {
-    this.logger.setContext('Audit');
+    this.logger.setContext('AuditInterceptor');
   }
 
   intercept(ctx: ExecutionContext, next: CallHandler): Observable<any> {
@@ -38,6 +40,7 @@ export class AuditInterceptor implements NestInterceptor {
             : null;
         await this.prisma.auditLog.create({
           data: {
+            id: this.ids.nextId(),
             actorId,
             ip,
             action: meta.action,

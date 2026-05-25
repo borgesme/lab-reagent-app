@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { MailerService } from '../notifications/mailer.service';
+import { IdService } from '../../common/id/id.service';
 
 const DEFAULT_EXPIRE_WARN_DAYS = 30;
 
@@ -20,6 +21,7 @@ export class AlertsService {
     private prisma: PrismaService,
     private notifications: NotificationsService,
     private mailer: MailerService,
+    private readonly ids: IdService,
   ) {}
 
   async runDaily() {
@@ -35,6 +37,7 @@ export class AlertsService {
     }
     await this.prisma.auditLog.create({
       data: {
+        id: this.ids.nextId(),
         action: 'ALERT_SCAN',
         entityType: 'Alert',
         after: { labs: labs.length, totalNotifications: total },
