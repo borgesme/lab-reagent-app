@@ -1,12 +1,16 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { IdService } from '../../common/id/id.service';
 import { CreateLabDto } from './dto/create-lab.dto';
 import { UpdateLabDto } from './dto/update-lab.dto';
 import { PageQueryDto } from './dto/page-query.dto';
 
 @Injectable()
 export class LabsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly ids: IdService,
+  ) {}
 
   list() {
     return this.prisma.lab.findMany({ where: { deletedAt: null } });
@@ -51,7 +55,12 @@ export class LabsService {
   }
 
   create(dto: CreateLabDto) {
-    return this.prisma.lab.create({ data: dto });
+    return this.prisma.lab.create({
+      data: {
+        id: this.ids.nextId(),
+        ...dto,
+      },
+    });
   }
 
   async update(id: string, dto: UpdateLabDto) {

@@ -11,6 +11,7 @@ import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RedisService } from '../../common/redis/redis.service';
 import { REDIS_KEYS } from '../../common/redis/redis.constants';
+import { IdService } from '../../common/id/id.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 
@@ -21,6 +22,7 @@ export class AuthService {
     private jwt: JwtService,
     private cfg: ConfigService,
     private redis: RedisService,
+    private readonly ids: IdService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -32,6 +34,7 @@ export class AuthService {
     });
     const user = await this.prisma.user.create({
       data: {
+        id: this.ids.nextId(),
         email: dto.email,
         name: dto.name,
         passwordHash,

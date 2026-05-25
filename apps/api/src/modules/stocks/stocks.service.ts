@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { IdService } from '../../common/id/id.service';
 import { CreateStockDto } from './dto/create-stock.dto';
 import { UpdateStockDto } from './dto/update-stock.dto';
 import { QueryStockDto } from './dto/query-stock.dto';
@@ -15,7 +16,10 @@ export interface ActorContext {
 
 @Injectable()
 export class StocksService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly ids: IdService,
+  ) {}
 
   async list(query: QueryStockDto, actor: ActorContext) {
     const where: any = { deletedAt: null };
@@ -33,6 +37,7 @@ export class StocksService {
     await this.assertLabAccess(dto.labId, actor);
     return this.prisma.reagentStock.create({
       data: {
+        id: this.ids.nextId(),
         reagentId: dto.reagentId,
         labId: dto.labId,
         batchNo: dto.batchNo,

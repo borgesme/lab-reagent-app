@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../../prisma/prisma.service';
+import { IdService } from '../../common/id/id.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { PageQueryDto } from './dto/page-query.dto';
@@ -18,7 +19,10 @@ const INCLUDE_FOR_VIEW = {
 
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly ids: IdService,
+  ) {}
 
   async list() {
     const rows = await this.prisma.user.findMany({
@@ -80,6 +84,7 @@ export class UsersService {
     const roleRecords = await this.resolveRoles(dto.roles ?? ['PLAIN_USER']);
     const row = await this.prisma.user.create({
       data: {
+        id: this.ids.nextId(),
         email: dto.email,
         name: dto.name,
         passwordHash,
