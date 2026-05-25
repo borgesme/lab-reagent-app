@@ -4,6 +4,7 @@ import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { LogsModule } from './logs/logs.module';
 import { RedisModule } from './common/redis/redis.module';
+import { IdModule } from './common/id/id.module';
 import { HealthController } from './health/health.controller';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -32,6 +33,7 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
     ConfigModule.forRoot({ isGlobal: true }),
     LogsModule,
     RedisModule,
+    IdModule,
     ScheduleModule.forRoot(),
     PrismaModule,
     AuthModule,
