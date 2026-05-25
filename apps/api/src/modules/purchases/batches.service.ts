@@ -172,7 +172,7 @@ export class BatchesService {
     const receipt = await this.prisma.$transaction(async (tx) => {
       const stockId = this.ids.nextId();
       const receiptId = this.ids.nextId();
-      const stock = await tx.reagentStock.create({
+      await tx.reagentStock.create({
         data: {
           id: stockId,
           reagentId: batch.reagentId,
